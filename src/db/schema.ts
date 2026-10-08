@@ -9,8 +9,9 @@ import {
   uuid,
   index,
   uniqueIndex,
+  check,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 // ─── Auth Tables ───────────────────────────────────────────────
 export const users = pgTable(
@@ -205,6 +206,30 @@ export const media = pgTable("media", {
   uploadedBy: uuid("uploaded_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// ─── Email ─────────────────────────────────────────────────────
+export const emails = pgTable(
+  "emails",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    messageId: varchar("message_id", { length: 255 }).unique(),
+    sender: varchar("sender", { length: 255 }).notNull(),
+    recipient: varchar("recipient", { length: 255 }).notNull(),
+    subject: text("subject"),
+    bodyText: text("body_text"),
+    bodyHtml: text("body_html"),
+    attachments: jsonb("attachments").$type<unknown[]>().default([]).notNull(),
+    direction: varchar("direction", { length: 10 })
+      .notNull()
+      .default("INBOUND"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("emails_direction_idx").on(t.direction),
+    index("emails_created_at_idx").on(t.createdAt),
+    check("emails_direction_check", sql`t.direction IN ('INBOUND', 'OUTBOUND')`),
+  ]
+);
 
 // ─── Site Settings ─────────────────────────────────────────────
 export const siteSettings = pgTable("site_settings", {

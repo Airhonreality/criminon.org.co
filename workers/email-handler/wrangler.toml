@@ -1,0 +1,7 @@
+name = "criminonorgco-email-handler"
+main = "src/index.js"
+compatibility_date = "2024-03-01"
+
+[[r2_buckets]]
+binding = 'EMAIL_BUCKET'
+bucket_name = 'criminonorgco-email-assets'
