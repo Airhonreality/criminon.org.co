@@ -1,11 +1,15 @@
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 
 export default function MailToolbar() {
+  const searchParams = useSearchParams();
+  const folder = searchParams.get("folder") || "INBOX";
+
   return (
     <div className="flex items-center justify-between p-3 rounded-md border border-border bg-card">
       <span className="text-sm text-muted-foreground">
-        15 mensajes
+        {folder === "INBOX" ? "Cargando..." : "0 mensajes"}
       </span>
       <div className="flex items-center gap-2">
         <Button size="icon" variant="ghost">

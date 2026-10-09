@@ -46,7 +46,42 @@ export async function GET(request: Request) {
       whereConditions.push(sql`is_starred = false`);
     }
 
-    whereConditions.push(sql`direction = 'INBOUND'`);
+    
+
+    const id = searchParams.get("id");
+
+    // If ID is provided, fetch single email
+    if (id) {
+      const [singleEmail] = await db
+        .select({
+          id: emails.id,
+          messageId: emails.messageId,
+          sender: emails.sender,
+          recipient: emails.recipient,
+          subject: emails.subject,
+          bodyText: emails.bodyText,
+          bodyHtml: emails.bodyHtml,
+          attachments: emails.attachments,
+          direction: emails.direction,
+          folder: emails.folder,
+          isRead: emails.isRead,
+          isStarred: emails.isStarred,
+          createdAt: emails.createdAt,
+          inReplyTo: emails.inReplyTo,
+          references: emails.references,
+          updatedAt: emails.updatedAt,
+        })
+        .from(emails)
+        .where(eq(emails.id, id));
+
+      if (singleEmail) {
+        return NextResponse.json({ email: singleEmail });
+      }
+      return NextResponse.json(
+        { error: "Email no encontrado" },
+        { status: 404 }
+      );
+    }
 
     const whereClause = and(...whereConditions);
 
