@@ -36,6 +36,14 @@ export async function POST(request: Request) {
       text: textContent,
     });
 
+    if (result.error) {
+      console.error("Resend send error:", result.error);
+      return NextResponse.json(
+        { error: result.error.message || "Error al enviar el correo" },
+        { status: 502 }
+      );
+    }
+
     const messageId = result.data?.id ?? null;
 
     await db.insert(emails).values({

@@ -11,11 +11,13 @@ export default function MailComposer() {
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   const handleSend = async () => {
     if (!to || !subject || !body) return;
     setSending(true);
     setError(null);
+    setSuccess(false);
     try {
       const res = await fetch("/api/send-email", {
         method: "POST",
@@ -28,7 +30,7 @@ export default function MailComposer() {
       if (!res.ok) {
         setError(data.error || "Error desconocido");
       } else {
-        // Éxito - cerrar composer o limpiar campos
+        setSuccess(true);
         setTo("");
         setSubject("");
         setBody("");
@@ -66,6 +68,9 @@ export default function MailComposer() {
       <Button onClick={handleSend} disabled={sending || !to || !subject || !body}>
         {sending ? "Sending..." : "Send"}
       </Button>
+      {success && (
+        <p className="text-sm text-green-600 mt-2">Mensaje enviado correctamente.</p>
+      )}
       {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
     </div>
   );
