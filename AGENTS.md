@@ -27,15 +27,25 @@ Saliente: `src/lib/resend.ts` expone `sendEmail()`, usa `Resend` con remitente f
 - Migraciones/schema con `drizzle-kit`; verificar tipos con `npx tsc --noEmit` y lint con `npm run lint`.
 - El proyecto usa Next.js 16 — antes de tocar APIs/convenciones, leer `node_modules/next/dist/docs/`.
 
-## Variables de entorno (.env.local, NO commitear)
+## Variables de entorno
 
-`DATABASE_URL` (Neon), `RESEND_API_KEY`, `WEBHOOK_SECRET` (generado: ver `.env.local`), `R2_PUBLIC_URL`.
+Fuente de verdad: **Infisical**, proyecto `criminon-web` (`workspaceId` en `.infisical.json`, entorno por defecto `dev`; `prod` tiene el mismo set). `.env.local` es solo un espejo local y NO se commitea (`.gitignore: .env*`).
+
+```bash
+infisical secrets          # listar (requiere `infisical login`)
+infisical run -- <cmd>     # inyectar las 5 vars en un comando
+npm run db:push            # = infisical run -- drizzle-kit push
+```
+
+Vars: `DATABASE_URL` (Neon), `RESEND_API_KEY`, `WEBHOOK_SECRET`, `R2_PUBLIC_URL`, `CLOUDFLARE_API_TOKEN`.
+
+Nota: `drizzle-kit` NO lee `.env.local`; usa `npm run db:push` (o exporta `DATABASE_URL` a mano).
 
 ## Estado actual
 
-- DONE en local: `.env.local`, `workers/email-handler/` (código + `wrangler.toml`), `r2-cors.json`, webhook `src/app/api/webhooks/incoming-email/route.ts`, `src/lib/resend.ts`, tabla `emails` en Drizzle. `tsc` y `eslint` limpios.
-- BLOQUEADO en Cloudflare: **R2 sin habilitar** en la cuenta (`code: 10042`, Dashboard → R2 → Enable, requiere método de pago). Hasta habilitarlo no se puede crear el bucket ni desplegar el Worker (el binding R2 en `wrangler.toml` lo impide).
-- PENDIENTE tras R2: `npx wrangler r2 bucket create criminonorgco-email-assets`, aplicar CORS (`r2-cors.json`), `npx wrangler deploy` (dentro de `workers/email-handler`), `npx wrangler secret put WEBHOOK_SECRET` y `R2_PUBLIC_URL`, activar Email Routing hacia el Worker en Dashboard.
-- PENDIENTE credenciales: `DATABASE_URL` y `RESEND_API_KEY` reales las rellena el usuario en `.env.local`.
-- Blocker Cloudflare: `npx wrangler login` (OAuth) ya hecho por el usuario — cuenta `46e1acdc8ec581550c5a55167566bcfd`.
-- Despliegue: Vercel (repo `origin/main`), dominio `criminon.org.co` registrado en Spaceship; DNS en Cloudflare; Email Routing alias `contacto@`; Resend con DKIM `resend._domainkey`.
+- DONE: `.env.local`, `workers/email-handler/` + `wrangler.toml`, `r2-cors.json`, webhook `src/app/api/webhooks/incoming-email/route.ts`, `src/lib/resend.ts`, tabla `emails`.
+- DONE: proyecto Infisical `criminon-web` con las 5 vars en `dev` y `prod`, enlazado vía `.infisical.json` (commiteable, sin secretos).
+- DONE: schema aplicado a Neon con `drizzle-kit push` — 16 tablas, incluida `emails`. Fix en `src/db/schema.ts`: el `check()` generaba `CHECK (t.direction …)` → SQL inválido; se quitó el prefijo `t.`.
+- FALTA (MVP webmail): API de listado, API de detalle, API de envío, frontend de bandeja.
+- PENDIENTE Cloudflare: R2/bucket/Worker/Email Routing (ver historial: R2 sin habilitar, `code:10042`).
+- Despliegue: Vercel (`origin/main`), dominio `criminon.org.co`; DNS en Cloudflare; Email Routing alias `contacto@`; Resend con DKIM `resend._domainkey`.

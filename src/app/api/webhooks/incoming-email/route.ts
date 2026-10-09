@@ -31,6 +31,8 @@ export async function POST(req: Request) {
       bodyHtml: body.bodyHtml ?? null,
       attachments: Array.isArray(body.attachments) ? body.attachments : [],
       direction: body.direction === "OUTBOUND" ? "OUTBOUND" : "INBOUND",
+      folder: "INBOX",
+      isRead: false,
     });
 
     return NextResponse.json({ success: true });

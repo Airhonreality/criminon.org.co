@@ -223,11 +223,19 @@ export const emails = pgTable(
       .notNull()
       .default("INBOUND"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    folder: varchar("folder", { length: 20 })
+      .notNull()
+      .default("INBOX"),
+    isRead: boolean("is_read").notNull().default(false),
+    isStarred: boolean("is_starred").notNull().default(false),
+    inReplyTo: varchar("in_reply_to", { length: 255 }),
+    references: varchar("references", { length: 255 }),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (t) => [
     index("emails_direction_idx").on(t.direction),
     index("emails_created_at_idx").on(t.createdAt),
-    check("emails_direction_check", sql`t.direction IN ('INBOUND', 'OUTBOUND')`),
+    check("emails_direction_check", sql`direction IN ('INBOUND', 'OUTBOUND')`),
   ]
 );
 
