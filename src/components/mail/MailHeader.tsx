@@ -1,36 +1,16 @@
-"use client";
+import { folderLabel, type MailFolder } from "./types";
 
-import { useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-
-export default function MailHeader() {
-  const [search, setSearch] = useState("");
-
+export default function MailHeader({ folder }: { folder: MailFolder }) {
   return (
-    <header className="border-b border-border p-4 md:p-6 bg-card">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-medium">Mailbox</h1>
-        <div className="flex items-center gap-2">
-          <Input
-            placeholder="Search..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1"
-          />
-          <Button variant="outline" size="sm">
-            Search
-          </Button>
+    <header className="border-b border-border bg-card p-4 md:p-6 mb-4 rounded-md">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-medium">Mailbox</h1>
+          <p className="text-sm text-muted-foreground">
+            contacto@criminoncolombia.org
+          </p>
         </div>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm">Inbox</Button>
-        <Button variant="outline" size="sm">Starred</Button>
-        <Button variant="outline" size="sm">Sent</Button>
-        <Button variant="outline" size="sm">Drafts</Button>
-        <Button variant="outline" size="sm">Archive</Button>
-        <Button variant="outline" size="sm">Spam</Button>
-        <Button variant="outline" size="sm">Trash</Button>
+        <span className="text-sm font-medium">{folderLabel(folder)}</span>
       </div>
     </header>
   );

@@ -1,75 +1,77 @@
-"use client";
-
-import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { useRouter } from "next/navigation";
+import { folderLabel, type MailEmail, type MailFolder } from "./types";
 
-export interface MailListEmail {
-  id: string;
-  messageId: string;
-  sender: string;
-  recipient: string;
-  subject: string;
-  bodyText: string;
-  folder: string;
-  isRead: boolean;
-  createdAt: Date;
-}
+export default function MailList({
+  emails,
+  loading,
+  error,
+  folder,
+  onSelect,
+  onRetry,
+}: {
+  emails: MailEmail[];
+  loading: boolean;
+  error: string | null;
+  folder: MailFolder;
+  onSelect: (email: MailEmail) => void;
+  onRetry: () => void;
+}) {
+  if (loading) {
+    return (
+      <div className="border rounded-md p-4 bg-card">
+        <p className="text-sm text-muted-foreground">Cargando mensajes...</p>
+      </div>
+    );
+  }
 
-export default function MailList() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const [folder, setFolder] = useState(() => searchParams.get("folder") || "INBOX");
-  const [emails, setEmails] = useState<MailListEmail[]>([]);
-  const [loading, setLoading] = useState(true);
+  if (error) {
+    return (
+      <div className="border rounded-md p-4 bg-card">
+        <p className="text-sm text-red-600 mb-2">{error}</p>
+        <Button size="sm" variant="outline" onClick={onRetry}>
+          Reintentar
+        </Button>
+      </div>
+    );
+  }
 
-  useEffect(() => {
-    const fetchEmails = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`/api/emails?folder=${folder}`, {
-          credentials: "include",
-        });
-        const data = await res.json();
-        setEmails(data.data || []);
-      } catch (err) {
-        console.error("Error fetching emails:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchEmails();
-  }, [folder]);
+  if (emails.length === 0) {
+    return (
+      <div className="border rounded-md p-4 bg-card">
+        <p className="text-sm text-muted-foreground">
+          No hay mensajes en {folderLabel(folder)}.
+        </p>
+      </div>
+    );
+  }
+
+  const showRecipient = folder === "SENT" || folder === "DRAFTS";
 
   return (
-    <div className="border rounded-md p-4 bg-card h-[500px]">
-      {!emails.length && folder === "INBOX" ? (
-        <p className="text-sm text-muted-foreground">No hay mensajes en Inbox</p>
-      ) : (
-        <div className="space-y-2 max-h-[400px] overflow-y-auto">
-          {emails.map((email) => (
-            <div
-              key={email.id}
-              className="p-2 rounded-md border border-pointer cursor-pointer hover:bg-muted/50 transition-colors"
-              onClick={() => router.push(`/mail/${email.id}`)}
+    <div className="border rounded-md bg-card divide-y">
+      {emails.map((email) => (
+        <button
+          key={email.id}
+          onClick={() => onSelect(email)}
+          className="w-full text-left px-4 py-3 hover:bg-stone-50 transition-colors"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span
+              className={`text-sm truncate ${
+                email.isRead ? "text-stone-500" : "font-semibold text-stone-900"
+              }`}
             >
-              <div className="flex justify-between align-items-start">
-                <span className="text-sm font-medium truncate w-64">
-                  {email.subject}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {email.isRead ? "Leído" : "No leído"}
-                </span>
-              </div>
-              <div className="flex text-xs text-muted-foreground">
-                <span>{email.sender}</span>
-                <span>{email.folder}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+              {email.subject || "(Sin asunto)"}
+            </span>
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
+              {new Date(email.createdAt).toLocaleDateString()}
+            </span>
+          </div>
+          <div className="text-xs text-muted-foreground truncate">
+            {showRecipient ? `Para: ${email.recipient}` : email.sender}
+          </div>
+        </button>
+      ))}
     </div>
   );
 }

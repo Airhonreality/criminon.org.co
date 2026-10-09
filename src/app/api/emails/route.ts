@@ -17,8 +17,10 @@ export async function GET(request: Request) {
     // Build where conditions
     const whereConditions = [];
 
-    // Folder filter
-    whereConditions.push(sql`folder = ${folder}`);
+    // Folder filter (omitido en vista Starred para mostrar destacados de cualquier carpeta)
+    if (!starred) {
+      whereConditions.push(sql`folder = ${folder}`);
+    }
 
     // Search filter
     if (q) {

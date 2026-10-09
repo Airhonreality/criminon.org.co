@@ -2,7 +2,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Dominio
 
-El dominio `criminon.org.co` fue adquirido en [Spaceship](https://www.spaceship.com) (registrador / reseller de dominios).
+El dominio `criminoncolombia.org` fue adquirido y está registrado con DNS en Cloudflare.
 
 ## Getting Started
 

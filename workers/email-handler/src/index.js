@@ -32,7 +32,7 @@ const worker = {
       attachments: attachments,
     };
 
-    const response = await fetch('https://criminon.org.co/api/webhooks/incoming-email', {
+    const response = await fetch('https://criminoncolombia.org/api/webhooks/incoming-email', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

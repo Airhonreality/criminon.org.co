@@ -48,7 +48,7 @@ export async function POST(request: Request) {
 
     await db.insert(emails).values({
       messageId,
-      sender: "Contacto <contacto@criminon.org.co>",
+      sender: "Contacto <contacto@criminoncolombia.org>",
       recipient: to,
       subject,
       bodyText: textContent,

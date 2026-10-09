@@ -1,5 +1,5 @@
-import MailLayout from "@/components/mail/MailLayout";
+import MailApp from "@/components/mail/MailApp";
 
 export default function MailPage() {
-  return <MailLayout />;
+  return <MailApp />;
 }

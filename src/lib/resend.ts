@@ -14,7 +14,7 @@ export async function sendEmail({
   text: string;
 }) {
   return await resend.emails.send({
-    from: "Contacto <contacto@criminon.org.co>",
+    from: "Contacto <contacto@criminoncolombia.org>",
     to,
     subject,
     html,

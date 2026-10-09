@@ -1,157 +1,85 @@
-"use client";
-
-import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { useRouter } from "next/navigation";
-import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { type MailEmail, type MailFolder } from "./types";
 
-export interface MailReaderEmail {
-  id: string;
-  messageId: string;
-  sender: string;
-  recipient: string;
-  subject: string;
-  bodyText: string;
-  bodyHtml?: string;
-  attachments: Array<{ filename: string; size?: string; url?: string }>;
-  folder: string;
-  isRead: boolean;
-  isStarred: boolean;
-  createdAt: Date;
-  inReplyTo?: string;
-  references?: string;
-  updatedAt: Date;
-}
-
-export default function MailReader() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const { id: paramId } = useParams<{ id: string }>();
-  const [messageId, setMessageId] = useState(() => paramId || searchParams.get("id") || "");
-  const [email, setEmail] = useState<MailReaderEmail>({
-    id: "",
-    messageId: "",
-    sender: "",
-    recipient: "",
-    subject: "",
-    bodyText: "",
-    bodyHtml: "",
-    attachments: [],
-    folder: "",
-    isRead: false,
-    isStarred: false,
-    createdAt: new Date(),
-    inReplyTo: "",
-    references: "",
-    updatedAt: new Date(),
-  });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchEmail = async () => {
-      if (!messageId) {
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      try {
-        const res = await fetch(`/api/emails/${messageId}`, {
-          credentials: "include",
-        });
-        const data = await res.json();
-        setEmail(data.email || email);
-        if (!email.isRead) {
-          await fetch(`/api/emails/${messageId}`, {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ isRead: true }),
-          });
-        }
-      } catch (err) {
-        console.error("Error fetching email:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchEmail();
-  }, [messageId]);
-
-  useEffect(() => {
-    if (!email.isRead && email.id) {
-      fetch(`/api/emails/${email.id}`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isRead: true }),
-      });
-    }
-  }, [email.isRead, email.id]);
-
-  if (loading) {
-    return (
-      <div className="border rounded-md p-4 bg-card h-[500px]">
-        <p className="text-sm text-muted-foreground">Cargando mensaje...</p>
-      </div>
-    );
-  }
-
-  if (!email.id) {
-    return (
-      <div className="border rounded-md p-4 bg-card h-[500px]">
-        <p className="text-sm text-muted-foreground">Mensaje no encontrado</p>
-      </div>
-    );
-  }
+export default function MailReader({
+  email,
+  folder,
+  onBack,
+  onToggleStar,
+  onMove,
+}: {
+  email: MailEmail;
+  folder: MailFolder;
+  onBack: () => void;
+  onToggleStar: () => void;
+  onMove: (target: MailFolder) => void;
+}) {
+  const isTrash = folder === "TRASH";
+  const isSpam = folder === "SPAM";
+  const showRecipient = folder === "SENT" || folder === "DRAFTS";
+  const attachments = Array.isArray(email.attachments) ? email.attachments : [];
 
   return (
-    <div className="border rounded-md p-4 bg-card h-[500px]">
-      <div className="flex flex-col gap-4 h-full">
-        <div>
-          <span className="text-lg font-medium">{email.subject}</span>
-          <div className="text-sm text-muted-foreground flex gap-4">
-            <span>{email.sender}</span>
-            <span>{email.recipient}</span>
-            <span>{email.folder}</span>
-            <span>{email.createdAt.toLocaleDateString()}</span>
+    <div className="border rounded-md bg-card">
+      <div className="flex flex-wrap items-center gap-2 p-3 border-b">
+        <Button size="sm" variant="outline" onClick={onBack}>
+          Volver
+        </Button>
+        {isTrash ? (
+          <Button size="sm" variant="outline" onClick={() => onMove("INBOX")}>
+            Restaurar
+          </Button>
+        ) : isSpam ? (
+          <Button size="sm" variant="outline" onClick={() => onMove("INBOX")}>
+            No es spam
+          </Button>
+        ) : (
+          <>
+            <Button size="sm" variant="outline" onClick={onToggleStar}>
+              {email.isStarred ? "Quitar estrella" : "Destacar"}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => onMove("ARCHIVE")}>
+              Archivar
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => onMove("SPAM")}>
+              Spam
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => onMove("TRASH")}>
+              Papelera
+            </Button>
+          </>
+        )}
+      </div>
+
+      <div className="p-4">
+        <h2 className="text-lg font-semibold">{email.subject || "(Sin asunto)"}</h2>
+        <div className="text-sm text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 mt-1">
+          {showRecipient ? (
+            <span>Para: {email.recipient}</span>
+          ) : (
+            <>
+              <span>De: {email.sender}</span>
+              <span>Para: {email.recipient}</span>
+            </>
+          )}
+          <span>{new Date(email.createdAt).toLocaleString()}</span>
+        </div>
+
+        <div className="mt-4 text-sm whitespace-pre-wrap">
+          {email.bodyText || email.bodyHtml || "Sin contenido"}
+        </div>
+
+        {attachments.length > 0 && (
+          <div className="mt-4">
+            <p className="text-sm font-medium mb-1">Adjuntos:</p>
+            <ul className="text-xs text-muted-foreground space-y-1">
+              {attachments.map((att, i) => {
+                const a = att as { filename?: string };
+                return <li key={i}>{a.filename || `Adjunto ${i + 1}`}</li>;
+              })}
+            </ul>
           </div>
-        </div>
-
-        <div className="flex-1 min-h-0">
-          <p className="text-sm font-medium">Cuerpo texto:</p>
-          <p className="text-sm line-break-all whitespace-pre-wrap">{email.bodyText || "Sin contenido de texto"}</p>
-
-          {email.bodyHtml ? (
-            <div className="mt-2 p-2 rounded-md bg-card/50">
-              <p className="text-sm font-medium">HTML (sanitizado):</p>
-              <p className="text-sm line-break-all whitespace-pre-wrap">{email.bodyHtml}</p>
-            </div>
-          ) : null}
-
-          {email.attachments.length > 0 ? (
-            <div className="mt-2">
-              <p className="text-sm font-medium">Adjuntos:</p>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                {email.attachments.map((att) => (
-                  <li key={att.filename} className="text-xs">
-                    {att.filename} {att.size ? `(${att.size})` : ""}
-                    {att.url && (
-                      <a
-                        href={att.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline text-primary hover:underline-opacity-50"
-                      >
-                        Ver
-                      </a>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-        </div>
+        )}
       </div>
     </div>
   );

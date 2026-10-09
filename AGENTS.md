@@ -10,7 +10,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # Correo Corporativo (Email Handler)
 
-Sistema de correo corporativo para `criminon.org.co` (correo: `contacto@criminon.org.co`), con recepción vía Cloudflare Email Worker + R2 y envío vía Resend.
+Sistema de correo corporativo para `criminoncolombia.org` (correo: `contacto@criminoncolombia.org`), con recepción vía Cloudflare Email Worker + R2 y envío vía Resend.
 
 ## Arquitectura (flujo entrante)
 
@@ -18,7 +18,7 @@ Sistema de correo corporativo para `criminon.org.co` (correo: `contacto@criminon
 2. **Worker de Email** (`workers/email-handler/src/index.js`) guarda adjuntos en el bucket R2 `criminonorgco-email-assets` y hace `POST` al webhook de Next.js con `Authorization: Bearer $WEBHOOK_SECRET`.
 3. **Webhook** (`src/app/api/webhooks/incoming-email/route.ts`) valida el secreto e inserta en Neon Postgres (tabla `emails`, definida en `src/db/schema.ts`).
 
-Saliente: `src/lib/resend.ts` expone `sendEmail()`, usa `Resend` con remitente fijo `Contacto <contacto@criminon.org.co>`.
+Saliente: `src/lib/resend.ts` expone `sendEmail()`, usa `Resend` con remitente fijo `Contacto <contacto@criminoncolombia.org>`.
 
 ## Convenciones de este repo
 
@@ -48,4 +48,4 @@ Nota: `drizzle-kit` NO lee `.env.local`; usa `npm run db:push` (o exporta `DATAB
 - DONE: schema aplicado a Neon con `drizzle-kit push` — 16 tablas, incluida `emails`. Fix en `src/db/schema.ts`: el `check()` generaba `CHECK (t.direction …)` → SQL inválido; se quitó el prefijo `t.`.
 - FALTA (MVP webmail): API de listado, API de detalle, API de envío, frontend de bandeja.
 - PENDIENTE Cloudflare: R2/bucket/Worker/Email Routing (ver historial: R2 sin habilitar, `code:10042`).
-- Despliegue: Vercel (`origin/main`), dominio `criminon.org.co`; DNS en Cloudflare; Email Routing alias `contacto@`; Resend con DKIM `resend._domainkey`.
+- Despliegue: Vercel (`origin/main`), dominio `criminoncolombia.org`; DNS en Cloudflare; Email Routing alias `contacto@`; Resend con DKIM `resend._domainkey`.
