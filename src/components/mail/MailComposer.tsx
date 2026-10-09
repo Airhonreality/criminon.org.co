@@ -1,6 +1,5 @@
 "use client";
 
-import { sendEmail } from "@/lib/resend";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,14 +10,31 @@ export default function MailComposer() {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSend = async () => {
     if (!to || !subject || !body) return;
     setSending(true);
+    setError(null);
     try {
-      await sendEmail({ to, subject, html: `<p>${body}</p>`, text: body });
-    } catch (e) {
-      console.error("Send error", e);
+      const res = await fetch("/api/send-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ to, subject, body }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Error desconocido");
+      } else {
+        // Éxito - cerrar composer o limpiar campos
+        setTo("");
+        setSubject("");
+        setBody("");
+      }
+    } catch (err) {
+      setError("Error de conexión");
     } finally {
       setSending(false);
     }
@@ -50,6 +66,7 @@ export default function MailComposer() {
       <Button onClick={handleSend} disabled={sending || !to || !subject || !body}>
         {sending ? "Sending..." : "Send"}
       </Button>
+      {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
     </div>
   );
 }
