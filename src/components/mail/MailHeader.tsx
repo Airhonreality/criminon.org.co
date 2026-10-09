@@ -1,6 +1,8 @@
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+"use client";
+
 import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 export default function MailHeader() {
   const [search, setSearch] = useState("");
@@ -22,27 +24,13 @@ export default function MailHeader() {
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm">
-          Inbox
-        </Button>
-        <Button variant="outline" size="sm">
-          Starred
-        </Button>
-        <Button variant="outline" size="sm">
-          Sent
-        </Button>
-        <Button variant="outline" size="sm">
-          Drafts
-        </Button>
-        <Button variant="outline" size="sm">
-          Archive
-        </Button>
-        <Button variant="outline" size="sm">
-          Spam
-        </Button>
-        <Button variant="outline" size="sm">
-          Trash
-        </Button>
+        <Button variant="outline" size="sm">Inbox</Button>
+        <Button variant="outline" size="sm">Starred</Button>
+        <Button variant="outline" size="sm">Sent</Button>
+        <Button variant="outline" size="sm">Drafts</Button>
+        <Button variant="outline" size="sm">Archive</Button>
+        <Button variant="outline" size="sm">Spam</Button>
+        <Button variant="outline" size="sm">Trash</Button>
       </div>
     </header>
   );

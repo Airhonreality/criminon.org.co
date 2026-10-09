@@ -1,3 +1,5 @@
+"use client";
+
 import { sendEmail } from "@/lib/resend";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
