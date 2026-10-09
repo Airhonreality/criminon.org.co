@@ -1,42 +1,50 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { emails } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
 import { sendEmail } from "@/lib/resend";
+
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const { to, subject, html, text } = body;
+    const { to, subject, body: rawBody, html, text } = body;
 
-    if (!to || !subject || !html) {
+    if (!to || !subject || (!rawBody && !html && !text)) {
       return NextResponse.json(
-        { error: "Faltan campos obligatorios: to, subject, html" },
+        { error: "Faltan campos obligatorios: to, subject y contenido" },
         { status: 400 }
       );
     }
 
-    // Enviar email usando la lib Resend
+    const textContent = text ?? rawBody ?? "";
+    const htmlContent =
+      html ?? (textContent ? escapeHtml(textContent).replace(/\n/g, "<br/>") : "");
+
     const result = await sendEmail({
       to,
       subject,
-      html,
-      text,
+      html: htmlContent,
+      text: textContent,
     });
 
-    // Resend return type es { data, error }
-    // El ID viene en data.id o result.data.id
-    const messageId = (result.data as any)?.id ?? null;
+    const messageId = result.data?.id ?? null;
 
-    // Opcional: guardar en la BD el email enviado
     await db.insert(emails).values({
       messageId,
       sender: "Contacto <contacto@criminon.org.co>",
       recipient: to,
       subject,
-      bodyText: text,
-      bodyHtml: html,
+      bodyText: textContent,
+      bodyHtml: htmlContent,
       direction: "OUTBOUND",
       folder: "SENT",
       isRead: false,

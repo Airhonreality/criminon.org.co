@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import MailHeader from "./MailHeader";
 import MailSidebar from "./MailSidebar";
 import MailToolbar from "./MailToolbar";
@@ -12,12 +13,18 @@ export default function MailLayout() {
       <div className="flex flex-col md:flex-row gap-4">
         <MailSidebar />
         <div className="flex-1 flex flex-col gap-4">
-          <MailToolbar />
-          <div className="flex-1 flex flex-col gap-2">
-            <MailList />
-            <MailReader />
-            <MailComposer />
-          </div>
+          <Suspense
+            fallback={
+              <div className="text-sm text-muted-foreground">Cargando...</div>
+            }
+          >
+            <MailToolbar />
+            <div className="flex-1 flex flex-col gap-2">
+              <MailList />
+              <MailReader />
+              <MailComposer />
+            </div>
+          </Suspense>
         </div>
       </div>
     </div>

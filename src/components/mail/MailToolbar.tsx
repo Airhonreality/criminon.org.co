@@ -1,3 +1,5 @@
+"use client";
+
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
