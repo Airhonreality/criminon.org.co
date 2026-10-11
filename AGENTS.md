@@ -48,6 +48,9 @@ Nota: `drizzle-kit` NO lee `.env.local`; usa `npm run db:push` (o exporta `DATAB
 - DONE: `.env.local`, `workers/email-handler/` + `wrangler.toml`, `r2-cors.json`, webhook `src/app/api/webhooks/incoming-email/route.ts`, `src/lib/resend.ts`, tabla `emails`.
 - DONE: proyecto Infisical `criminon-web` con los secretos en `dev` y `prod`, enlazado vía `.infisical.json` (commiteable, sin secretos). Incluye credenciales S3 de R2 (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`) en ambos entornos.
 - DONE: schema aplicado a Neon con `drizzle-kit push` — 16 tablas, incluida `emails`. Fix en `src/db/schema.ts`: el `check()` generaba `CHECK (t.direction …)` → SQL inválido; se quitó el prefijo `t.`.
-- FALTA (MVP webmail): API de listado, API de detalle, API de envío, frontend de bandeja.
-- PENDIENTE Cloudflare: R2/bucket/Worker/Email Routing (ver historial: R2 sin habilitar, `code:10042`).
+- DONE (webmail): API `GET/POST /api/emails` (listado/detalle/mover/star), `/api/send-email` (Resend + plantilla HTML + firma), `/api/uploads` (URL prefirmada R2) y UI de bandeja (`src/components/mail/*`).
+- DONE (fase 6 — composer profesional): editor **BlockNote** (`BlockEditor.tsx`, i18n `es`, autofocus), **adjuntos salientes a R2** por URL prefirmada (`src/lib/r2.ts`), cuerpo **HTML** con plantilla email-safe + firma (`src/lib/email-template.tsx`, React Email), `cc`/`bcc`, y lector que renderiza el HTML entrante en **iframe sandbox** con descargas de adjuntos. Composer como superficie overlay amplia (atajos `⌘/Ctrl+Enter` enviar, `Esc` cerrar).
+- DONE: `r2-cors.json` en formato `rules` aplicado al bucket `criminon` (`GET, HEAD, PUT`) vía `wrangler r2 bucket cors set`.
+- FALTA (fase 7 — no esencial): **auth** en `/mail` y `/api/emails|send-email|uploads` (hoy públicos), hilos, carpetas avanzadas, spam.
+- PENDIENTE Cloudflare: verificar entrega entrante (Worker/Email Routing) end-to-end.
 - Despliegue: Vercel (`origin/main`), dominio `criminoncolombia.org`; DNS en Cloudflare; Email Routing alias `contacto@`; Resend con DKIM `resend._domainkey`.

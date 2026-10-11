@@ -1,0 +1,46 @@
+/* Superficie de redacción cómoda para BlockNote (scoped a .mail-editor). */
+
+.mail-editor {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.mail-editor .bn-container {
+  height: 100%;
+  overflow-y: auto;
+  background: transparent;
+}
+
+/* Lienzo central: medida de lectura y ritmo vertical agradables. */
+.mail-editor .bn-editor {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 28px 32px 72px;
+  font-size: 15.5px;
+  line-height: 1.75;
+  min-height: 100%;
+}
+
+.mail-editor .bn-editor p,
+.mail-editor .bn-editor li {
+  line-height: 1.75;
+}
+
+/* El placeholder vacío se ve mejor con algo de color y peso. */
+.mail-editor .bn-editor .bn-inline-content:empty::before,
+.mail-editor [data-placeholder]::before {
+  color: #a8a29e;
+}
+
+/* Barra de formato flotante y menú "/" con sombra suave. */
+.mail-editor .bn-toolbar,
+.mail-editor .bn-suggestion-menu {
+  box-shadow: 0 10px 30px -10px rgba(28, 25, 23, 0.25);
+  border-radius: 10px;
+}
+
+/* Compacta el gutter de bloques para que el texto respire más. */
+.mail-editor .bn-block-content {
+  padding: 2px 0;
+}

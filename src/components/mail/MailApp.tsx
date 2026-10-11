@@ -27,6 +27,7 @@ export default function MailApp() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [composerOpen, setComposerOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,10 +109,14 @@ export default function MailApp() {
   };
 
   const handleSent = () => {
-    setFolder("SENT");
     setSelectedId(null);
-    setLoading(true);
     setError(null);
+    if (folder === "SENT") {
+      void handleRefresh();
+    } else {
+      setFolder("SENT");
+      setLoading(true);
+    }
   };
 
   return (
@@ -125,6 +130,7 @@ export default function MailApp() {
             count={emails.length}
             loading={loading}
             onRefresh={handleRefresh}
+            onCompose={() => setComposerOpen(true)}
           />
           {selected ? (
             <MailReader
@@ -144,7 +150,11 @@ export default function MailApp() {
               onRetry={handleRefresh}
             />
           )}
-          <MailComposer onSent={handleSent} />
+          <MailComposer
+            open={composerOpen}
+            onClose={() => setComposerOpen(false)}
+            onSent={handleSent}
+          />
         </div>
       </div>
     </div>

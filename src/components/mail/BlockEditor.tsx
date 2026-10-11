@@ -2,8 +2,10 @@
 
 import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
+import "./editor.css";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
+import { es } from "@blocknote/core/locales";
 import { useEffect } from "react";
 
 export default function BlockEditor({
@@ -14,6 +16,8 @@ export default function BlockEditor({
   uploadFile: (file: File) => Promise<string>;
 }) {
   const editor = useCreateBlockNote({
+    autofocus: true,
+    dictionary: es,
     uploadFile: (file: File) => uploadFile(file),
   });
 
@@ -25,7 +29,7 @@ export default function BlockEditor({
   }, [editor]);
 
   return (
-    <div className="border rounded-md bg-white">
+    <div className="mail-editor h-full min-h-0">
       <BlockNoteView editor={editor} theme="light" onChange={emit} />
     </div>
   );
