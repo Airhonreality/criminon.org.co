@@ -11,7 +11,7 @@ import {
 } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 import { es } from "@blocknote/core/locales";
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Bold,
   Code,
@@ -72,7 +72,6 @@ export default function BlockEditor({
   uploadFile: (file: File) => Promise<string>;
 }) {
   const editor = useCreateBlockNote({
-    autofocus: true,
     dictionary: es,
     uploadFile: (file: File) => uploadFile(file),
   });
@@ -98,6 +97,19 @@ export default function BlockEditor({
     syncBlock();
   }, editor);
   useEditorSelectionChange(syncBlock, editor);
+
+  // Enfoca el editor tras montar el DOM de ProseMirror (evita una carrera que
+  // lanzaba "Cannot read properties of null (reading 'setSelection')").
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      try {
+        editor.focus();
+      } catch {
+        /* el editor aún no está listo; el usuario puede hacer clic */
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [editor]);
 
   const applyType = (
     type: "paragraph" | "bulletListItem" | "numberedListItem" | "quote" | "codeBlock"
