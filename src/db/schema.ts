@@ -215,6 +215,8 @@ export const emails = pgTable(
     messageId: varchar("message_id", { length: 255 }).unique(),
     sender: varchar("sender", { length: 255 }).notNull(),
     recipient: varchar("recipient", { length: 255 }).notNull(),
+    cc: varchar("cc", { length: 255 }),
+    bcc: varchar("bcc", { length: 255 }),
     subject: text("subject"),
     bodyText: text("body_text"),
     bodyHtml: text("body_html"),

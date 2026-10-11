@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { emails } from "@/db/schema";
 import { sendEmail } from "@/lib/resend";
+import { renderEmail } from "@/lib/email-template";
 
 function escapeHtml(input: string): string {
   return input
@@ -12,28 +13,83 @@ function escapeHtml(input: string): string {
     .replace(/'/g, "&#39;");
 }
 
+function parseAddresses(value: unknown): string[] {
+  if (typeof value !== "string") return [];
+  return value
+    .split(/[,;]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+interface IncomingAttachment {
+  filename: string;
+  url: string;
+  mimeType?: string;
+  size?: number;
+}
+
+function parseAttachments(value: unknown): IncomingAttachment[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(
+      (a): a is IncomingAttachment =>
+        !!a &&
+        typeof a === "object" &&
+        typeof (a as IncomingAttachment).filename === "string" &&
+        typeof (a as IncomingAttachment).url === "string"
+    )
+    .map((a) => ({
+      filename: a.filename,
+      url: a.url,
+      mimeType: a.mimeType,
+      size: a.size,
+    }));
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const { to, subject, body: rawBody, html, text } = body;
+    const to = parseAddresses(body.to);
+    const cc = parseAddresses(body.cc);
+    const bcc = parseAddresses(body.bcc);
+    const subject = typeof body.subject === "string" ? body.subject.trim() : "";
+    const rawBody: string = body.body ?? "";
+    const attachments = parseAttachments(body.attachments);
 
-    if (!to || !subject || (!rawBody && !html && !text)) {
+    const hasContent = !!body.html || !!rawBody || !!body.text;
+    if (to.length === 0 || !subject || !hasContent) {
       return NextResponse.json(
-        { error: "Faltan campos obligatorios: to, subject y contenido" },
+        { error: "Faltan campos obligatorios: destinatario, asunto y contenido" },
         { status: 400 }
       );
     }
 
-    const textContent = text ?? rawBody ?? "";
-    const htmlContent =
-      html ?? (textContent ? escapeHtml(textContent).replace(/\n/g, "<br/>") : "");
+    const bodyHtml =
+      typeof body.html === "string" && body.html.trim()
+        ? body.html
+        : escapeHtml(rawBody || body.text || "").replace(/\n/g, "<br/>");
+
+    const { html, text } = await renderEmail({
+      subject,
+      bodyHtml,
+    });
 
     const result = await sendEmail({
       to,
       subject,
-      html: htmlContent,
-      text: textContent,
+      html,
+      text,
+      cc: cc.length ? cc : undefined,
+      bcc: bcc.length ? bcc : undefined,
+      replyTo: typeof body.replyTo === "string" ? body.replyTo : undefined,
+      attachments: attachments.length
+        ? attachments.map((a) => ({
+            filename: a.filename,
+            path: a.url,
+            contentType: a.mimeType,
+          }))
+        : undefined,
     });
 
     if (result.error) {
@@ -46,17 +102,25 @@ export async function POST(request: Request) {
 
     const messageId = result.data?.id ?? null;
 
-    await db.insert(emails).values({
-      messageId,
-      sender: "Contacto <contacto@criminoncolombia.org>",
-      recipient: to,
-      subject,
-      bodyText: textContent,
-      bodyHtml: htmlContent,
-      direction: "OUTBOUND",
-      folder: "SENT",
-      isRead: false,
-    });
+    try {
+      await db.insert(emails).values({
+        messageId,
+        sender: "Contacto <contacto@criminoncolombia.org>",
+        recipient: to.join(", "),
+        cc: cc.length ? cc.join(", ") : null,
+        bcc: bcc.length ? bcc.join(", ") : null,
+        subject,
+        bodyText: text,
+        bodyHtml: html,
+        attachments,
+        direction: "OUTBOUND",
+        folder: "SENT",
+        isRead: false,
+      });
+    } catch (dbError) {
+      // El correo ya se envió; no debe reportarse como fallo.
+      console.error("Error guardando correo enviado en la BD:", dbError);
+    }
 
     return NextResponse.json({ success: true, messageId });
   } catch (error) {

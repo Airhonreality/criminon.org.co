@@ -1,12 +1,21 @@
+export interface MailAttachment {
+  filename: string;
+  url?: string;
+  mimeType?: string;
+  size?: number;
+}
+
 export interface MailEmail {
   id: string;
   messageId: string | null;
   sender: string;
   recipient: string;
+  cc?: string | null;
+  bcc?: string | null;
   subject: string | null;
   bodyText: string | null;
   bodyHtml: string | null;
-  attachments: unknown[];
+  attachments: MailAttachment[];
   direction: string;
   folder: string;
   isRead: boolean;

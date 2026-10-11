@@ -15,7 +15,7 @@ Sistema de correo corporativo para `criminoncolombia.org` (correo: `contacto@cri
 ## Arquitectura (flujo entrante)
 
 1. **Cloudflare Email Routing** recibe el correo.
-2. **Worker de Email** (`workers/email-handler/src/index.js`) guarda adjuntos en el bucket R2 `criminonorgco-email-assets` y hace `POST` al webhook de Next.js con `Authorization: Bearer $WEBHOOK_SECRET`.
+2. **Worker de Email** (`workers/email-handler/src/index.js`) guarda adjuntos en el bucket R2 `criminon` (binding `EMAIL_BUCKET`, ver `workers/email-handler/wrangler.toml`) y hace `POST` al webhook de Next.js con `Authorization: Bearer $WEBHOOK_SECRET`.
 3. **Webhook** (`src/app/api/webhooks/incoming-email/route.ts`) valida el secreto e inserta en Neon Postgres (tabla `emails`, definida en `src/db/schema.ts`).
 
 Saliente: `src/lib/resend.ts` expone `sendEmail()`, usa `Resend` con remitente fijo `Contacto <contacto@criminoncolombia.org>`.
@@ -33,18 +33,20 @@ Fuente de verdad: **Infisical**, proyecto `criminon-web` (`workspaceId` en `.inf
 
 ```bash
 infisical secrets          # listar (requiere `infisical login`)
-infisical run -- <cmd>     # inyectar las 5 vars en un comando
+infisical run -- <cmd>     # inyectar los secretos en un comando
 npm run db:push            # = infisical run -- drizzle-kit push
 ```
 
-Vars: `DATABASE_URL` (Neon), `RESEND_API_KEY`, `WEBHOOK_SECRET`, `R2_PUBLIC_URL`, `CLOUDFLARE_API_TOKEN`.
+Vars: `DATABASE_URL` (Neon), `RESEND_API_KEY`, `WEBHOOK_SECRET`, `R2_PUBLIC_URL`, `CLOUDFLARE_API_TOKEN`, y las de acceso **S3 a R2** (subida de adjuntos salientes): `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` (`criminon`).
+
+Cliente S3 de R2: endpoint `https://<R2_ACCOUNT_ID>.r2.cloudflarestorage.com`, región `auto` (`@aws-sdk/client-s3`). Los objetos subidos quedan servidos por `R2_PUBLIC_URL`.
 
 Nota: `drizzle-kit` NO lee `.env.local`; usa `npm run db:push` (o exporta `DATABASE_URL` a mano).
 
 ## Estado actual
 
 - DONE: `.env.local`, `workers/email-handler/` + `wrangler.toml`, `r2-cors.json`, webhook `src/app/api/webhooks/incoming-email/route.ts`, `src/lib/resend.ts`, tabla `emails`.
-- DONE: proyecto Infisical `criminon-web` con las 5 vars en `dev` y `prod`, enlazado vía `.infisical.json` (commiteable, sin secretos).
+- DONE: proyecto Infisical `criminon-web` con los secretos en `dev` y `prod`, enlazado vía `.infisical.json` (commiteable, sin secretos). Incluye credenciales S3 de R2 (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`) en ambos entornos.
 - DONE: schema aplicado a Neon con `drizzle-kit push` — 16 tablas, incluida `emails`. Fix en `src/db/schema.ts`: el `check()` generaba `CHECK (t.direction …)` → SQL inválido; se quitó el prefijo `t.`.
 - FALTA (MVP webmail): API de listado, API de detalle, API de envío, frontend de bandeja.
 - PENDIENTE Cloudflare: R2/bucket/Worker/Email Routing (ver historial: R2 sin habilitar, `code:10042`).
