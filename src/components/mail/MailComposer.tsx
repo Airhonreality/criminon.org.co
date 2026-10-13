@@ -1,17 +1,25 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  AlertTriangle,
+  Check,
   Loader2,
   Maximize2,
   Minimize2,
   Paperclip,
+  RefreshCw,
+  Save,
   Send,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { ComposeInit } from "./compose";
+import RecipientField, { isValidEmail } from "./RecipientField";
+import { splitAddresses, type ComposeInit } from "./compose";
+import { formatSize } from "./format";
+import { mailApi } from "./api";
 
 const BlockEditor = dynamic(() => import("./BlockEditor"), {
   ssr: false,
@@ -20,11 +28,13 @@ const BlockEditor = dynamic(() => import("./BlockEditor"), {
   ),
 });
 
-interface Attachment {
+interface DraftAttachment {
+  id: string;
   filename: string;
-  url: string;
   mimeType?: string;
   size?: number;
+  url?: string;
+  state: "uploading" | "uploaded" | "failed";
 }
 
 function stripTags(html: string): string {
@@ -34,14 +44,7 @@ function stripTags(html: string): string {
     .trim();
 }
 
-function formatSize(bytes?: number): string {
-  if (!bytes) return "";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-async function uploadToR2(file: File): Promise<Attachment> {
+async function uploadFileToR2(file: File): Promise<string> {
   const prep = await fetch("/api/uploads", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -59,14 +62,9 @@ async function uploadToR2(file: File): Promise<Attachment> {
     headers: { "Content-Type": file.type || "application/octet-stream" },
     body: file,
   });
-  if (!put.ok) throw new Error(`No se pudo subir "${file.name}" a R2`);
+  if (!put.ok) throw new Error(`No se pudo subir "${file.name}"`);
 
-  return {
-    filename: file.name,
-    url: data.publicUrl as string,
-    mimeType: file.type || undefined,
-    size: file.size,
-  };
+  return data.publicUrl as string;
 }
 
 export default function MailComposer({
@@ -80,118 +78,246 @@ export default function MailComposer({
   onClose: () => void;
   onSent: () => void;
 }) {
-  const [to, setTo] = useState(initial?.to ?? "");
-  const [cc, setCc] = useState(initial?.cc ?? "");
-  const [bcc, setBcc] = useState(initial?.bcc ?? "");
+  const [to, setTo] = useState<string[]>(() => splitAddresses(initial?.to));
+  const [cc, setCc] = useState<string[]>(() => splitAddresses(initial?.cc));
+  const [bcc, setBcc] = useState<string[]>(() => splitAddresses(initial?.bcc));
   const [showCcBcc, setShowCcBcc] = useState(
     Boolean(initial?.cc || initial?.bcc)
   );
   const [subject, setSubject] = useState(initial?.subject ?? "");
   const [html, setHtml] = useState(initial?.html ?? "");
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [attachments, setAttachments] = useState<DraftAttachment[]>([]);
   const [editorKey, setEditorKey] = useState(0);
-  const inReplyTo = initial?.inReplyTo ?? null;
-  const references = initial?.references ?? null;
+  const [draftId, setDraftId] = useState<string | null>(
+    initial?.draftId ?? null
+  );
   const [expanded, setExpanded] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [saveState, setSaveState] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
+  const [closePrompt, setClosePrompt] = useState(false);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const filesRef = useRef<Map<string, File>>(new Map());
+  const savedSnapshotRef = useRef<string | null>(null);
+
+  const inReplyTo = initial?.inReplyTo ?? null;
+  const references = initial?.references ?? null;
+
+  const uploading = attachments.some((a) => a.state === "uploading");
+  const failed = attachments.some((a) => a.state === "failed");
   const busy = sending || uploading;
 
-  const handleEditorUpload = async (file: File): Promise<string> => {
-    const res = await uploadToR2(file);
-    return res.url;
-  };
-
-  const handleAttach = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    setError(null);
-    setSuccess(false);
-    setUploading(true);
-    try {
-      const uploaded: Attachment[] = [];
-      for (const file of Array.from(files)) {
-        uploaded.push(await uploadToR2(file));
-      }
-      setAttachments((prev) => [...prev, ...uploaded]);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al subir el archivo");
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };
-
-  const removeAttachment = (url: string) => {
-    setAttachments((prev) => prev.filter((a) => a.url !== url));
-  };
-
+  const allRecipients = [...to, ...cc, ...bcc];
+  const recipientsValid =
+    to.length > 0 && allRecipients.every(isValidEmail);
+  const hasContent =
+    allRecipients.length > 0 ||
+    subject.trim().length > 0 ||
+    stripTags(html).length > 0 ||
+    attachments.length > 0;
   const canSend =
-    to.trim().length > 0 &&
+    recipientsValid &&
     subject.trim().length > 0 &&
     stripTags(html).length > 0 &&
-    !busy;
+    !busy &&
+    !failed;
 
-  const resetForm = () => {
-    setTo("");
-    setCc("");
-    setBcc("");
+  const uploadedAttachments = attachments
+    .filter((a) => a.state === "uploaded")
+    .map((a) => ({
+      filename: a.filename,
+      url: a.url as string,
+      mimeType: a.mimeType,
+      size: a.size,
+    }));
+
+  const snapshot = JSON.stringify({
+    to,
+    cc,
+    bcc,
+    subject,
+    html,
+    uploadedAttachments,
+  });
+
+  const uploadEntry = useCallback(async (file: File, id: string) => {
+    setAttachments((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, state: "uploading" } : a))
+    );
+    try {
+      const url = await uploadFileToR2(file);
+      setAttachments((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, url, state: "uploaded" } : a))
+      );
+    } catch {
+      setAttachments((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, state: "failed" } : a))
+      );
+    }
+  }, []);
+
+  const addFiles = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const list = Array.from(files);
+    const entries: DraftAttachment[] = list.map((f) => ({
+      id: crypto.randomUUID(),
+      filename: f.name,
+      mimeType: f.type || undefined,
+      size: f.size,
+      state: "uploading",
+    }));
+    entries.forEach((entry, i) => filesRef.current.set(entry.id, list[i]));
+    setAttachments((prev) => [...prev, ...entries]);
+    entries.forEach((entry) => {
+      const file = filesRef.current.get(entry.id);
+      if (file) void uploadEntry(file, entry.id);
+    });
+  };
+
+  const retryAttachment = (id: string) => {
+    const file = filesRef.current.get(id);
+    if (file) void uploadEntry(file, id);
+  };
+
+  const removeAttachment = (id: string) => {
+    filesRef.current.delete(id);
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  const handleEditorUpload = async (file: File): Promise<string> => {
+    return uploadFileToR2(file);
+  };
+
+  const resetForm = useCallback(() => {
+    setTo([]);
+    setCc([]);
+    setBcc([]);
     setSubject("");
     setHtml("");
     setAttachments([]);
+    setDraftId(null);
+    setSaveState("idle");
+    savedSnapshotRef.current = null;
+    filesRef.current.clear();
     setEditorKey((k) => k + 1);
-  };
+  }, []);
+
+  const saveDraft = useCallback(async (): Promise<boolean> => {
+    if (!hasContent) return false;
+    setSaveState("saving");
+    try {
+      const res = await fetch("/api/drafts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: draftId,
+          to: to.join(", "),
+          cc: cc.join(", "),
+          bcc: bcc.join(", "),
+          subject,
+          html,
+          attachments: uploadedAttachments,
+          inReplyTo,
+          references,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "No se pudo guardar");
+      setDraftId(data.id as string);
+      setSaveState("saved");
+      return true;
+    } catch {
+      setSaveState("error");
+      return false;
+    }
+  }, [
+    hasContent,
+    draftId,
+    to,
+    cc,
+    bcc,
+    subject,
+    html,
+    uploadedAttachments,
+    inReplyTo,
+    references,
+  ]);
+
+  // Autosave: se reprograma en cada cambio (debounce). El setState ocurre sólo
+  // dentro del timeout/callback, no de forma síncrona en el efecto.
+  useEffect(() => {
+    if (!open || sending || saveState === "saving" || !hasContent) return;
+    if (snapshot === savedSnapshotRef.current) return;
+    const timer = setTimeout(async () => {
+      const ok = await saveDraft();
+      if (ok) savedSnapshotRef.current = snapshot;
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [open, sending, saveState, hasContent, snapshot, saveDraft]);
 
   const handleSend = async () => {
     if (!canSend) return;
     setSending(true);
     setError(null);
-    setSuccess(false);
     try {
       const res = await fetch("/api/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          to,
-          cc,
-          bcc,
+          to: to.join(", "),
+          cc: cc.join(", "),
+          bcc: bcc.join(", "),
           subject,
           html,
-          attachments,
+          attachments: uploadedAttachments,
           inReplyTo,
           references,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || "Error desconocido");
+        setError(data.error || "No se pudo enviar el mensaje");
+        setSending(false);
         return;
       }
-      setSuccess(true);
+      if (draftId) await mailApi.remove([draftId]).catch(() => {});
+      savedSnapshotRef.current = snapshot;
       resetForm();
       onSent();
       onClose();
     } catch {
       setError("Error de conexión");
-    } finally {
       setSending(false);
     }
   };
 
-  // Refs para atajos de teclado sin re-suscribir listeners.
+  const discardAndClose = async () => {
+    if (draftId) await mailApi.remove([draftId]).catch(() => {});
+    resetForm();
+    onClose();
+  };
+
+  const requestClose = useCallback(() => {
+    if (sending) return;
+    if (!hasContent) {
+      onClose();
+      return;
+    }
+    setClosePrompt(true);
+  }, [sending, hasContent, onClose]);
+
   const sendRef = useRef(handleSend);
-  const closeRef = useRef(onClose);
+  const closeRef = useRef(requestClose);
   const sendingRef = useRef(sending);
   useEffect(() => {
     sendRef.current = handleSend;
-    closeRef.current = onClose;
+    closeRef.current = requestClose;
     sendingRef.current = sending;
   });
 
-  // Atajos: Cmd/Ctrl+Enter envía, Esc cierra.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -207,7 +333,6 @@ export default function MailComposer({
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
-  // Bloquea el scroll de fondo mientras la superficie está abierta.
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
@@ -219,38 +344,48 @@ export default function MailComposer({
 
   if (!open) return null;
 
+  const title = initial?.draftId
+    ? "Borrador"
+    : inReplyTo
+      ? "Responder"
+      : /^fwd:/i.test(subject)
+        ? "Reenviar"
+        : "Nuevo mensaje";
+
   return (
     <div className="fixed inset-0 z-50 flex items-stretch justify-center sm:items-center sm:p-6">
       <button
         type="button"
         aria-label="Cerrar redacción"
-        onClick={onClose}
+        onClick={requestClose}
         className="absolute inset-0 bg-stone-900/30 backdrop-blur-sm"
       />
 
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Redactar mensaje"
-        className={`relative flex w-full flex-col overflow-hidden bg-white shadow-2xl border border-stone-200 rounded-none sm:rounded-2xl animate-fade-in ${
-          expanded ? "sm:max-w-5xl h-full sm:h-[95vh]" : "sm:max-w-3xl h-full sm:h-[85vh]"
+        aria-label={title}
+        className={`relative flex w-full flex-col overflow-hidden border border-stone-200 bg-white shadow-2xl sm:rounded-2xl ${
+          expanded
+            ? "h-full sm:h-[95vh] sm:max-w-5xl"
+            : "h-full sm:h-[85vh] sm:max-w-3xl"
         }`}
       >
         <header className="flex items-center justify-between border-b px-5 py-3">
-          <h2 className="text-sm font-medium">Nuevo mensaje</h2>
+          <h2 className="text-sm font-medium">{title}</h2>
           <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => setExpanded((v) => !v)}
-              className="hidden sm:inline-flex h-8 w-8 items-center justify-center rounded-md text-stone-500 hover:bg-stone-100 hover:text-stone-900"
+              className="hidden h-8 w-8 items-center justify-center rounded-md text-stone-500 hover:bg-stone-100 hover:text-stone-900 sm:inline-flex"
               aria-label={expanded ? "Contraer" : "Expandir"}
-              title={expanded ? "Contraer (ventana)" : "Expandir (pantalla completa)"}
+              title={expanded ? "Contraer" : "Expandir"}
             >
               {expanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
             </button>
             <button
               type="button"
-              onClick={onClose}
+              onClick={requestClose}
               className="inline-flex h-8 w-8 items-center justify-center rounded-md text-stone-500 hover:bg-stone-100 hover:text-stone-900"
               aria-label="Cerrar"
               title="Cerrar (Esc)"
@@ -261,22 +396,19 @@ export default function MailComposer({
         </header>
 
         <div className="px-5">
-          <div className="flex items-center gap-3 border-b py-2.5">
-            <span className="w-14 shrink-0 text-xs uppercase tracking-wide text-stone-500">
-              Para
-            </span>
-            <input
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              disabled={busy}
-              placeholder="destinatario@correo.com, otro@correo.com"
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-stone-400"
-            />
+          <RecipientField
+            label="Para"
+            value={to}
+            onChange={setTo}
+            disabled={busy}
+            placeholder="destinatario@correo.com, otro@correo.com"
+          />
+          <div className="flex justify-end border-b py-1.5">
             <button
               type="button"
               onClick={() => setShowCcBcc((v) => !v)}
               disabled={busy}
-              className="shrink-0 text-xs text-stone-500 hover:text-stone-900"
+              className="text-xs text-stone-500 hover:text-stone-900"
             >
               CC/CCO
             </button>
@@ -284,32 +416,12 @@ export default function MailComposer({
 
           {showCcBcc && (
             <>
-              <div className="flex items-center gap-3 border-b py-2.5">
-                <span className="w-14 shrink-0 text-xs uppercase tracking-wide text-stone-500">
-                  CC
-                </span>
-                <input
-                  value={cc}
-                  onChange={(e) => setCc(e.target.value)}
-                  disabled={busy}
-                  className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-                />
-              </div>
-              <div className="flex items-center gap-3 border-b py-2.5">
-                <span className="w-14 shrink-0 text-xs uppercase tracking-wide text-stone-500">
-                  CCO
-                </span>
-                <input
-                  value={bcc}
-                  onChange={(e) => setBcc(e.target.value)}
-                  disabled={busy}
-                  className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-                />
-              </div>
+              <RecipientField label="CC" value={cc} onChange={setCc} disabled={busy} />
+              <RecipientField label="CCO" value={bcc} onChange={setBcc} disabled={busy} />
             </>
           )}
 
-          <div className="flex items-center gap-3 border-b py-2.5">
+          <div className="flex items-center gap-3 border-b py-2">
             <span className="w-14 shrink-0 text-xs uppercase tracking-wide text-stone-500">
               Asunto
             </span>
@@ -336,21 +448,38 @@ export default function MailComposer({
           <div className="flex flex-wrap gap-2 border-t px-5 py-2.5">
             {attachments.map((att) => (
               <span
-                key={att.url}
-                className="inline-flex items-center gap-2 rounded-full border bg-stone-50 px-3 py-1 text-xs"
+                key={att.id}
+                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${
+                  att.state === "failed"
+                    ? "border-red-200 bg-red-50 text-red-700"
+                    : "bg-stone-50"
+                }`}
               >
-                <Paperclip size={12} className="text-stone-500" />
+                {att.state === "uploading" ? (
+                  <Loader2 size={12} className="animate-spin text-stone-500" />
+                ) : (
+                  <Paperclip size={12} className="text-stone-500" />
+                )}
                 <span className="max-w-56 truncate">{att.filename}</span>
                 {att.size ? (
-                  <span className="text-stone-500">
-                    {formatSize(att.size)}
-                  </span>
+                  <span className="text-stone-500">{formatSize(att.size)}</span>
                 ) : null}
+                {att.state === "failed" && (
+                  <button
+                    type="button"
+                    onClick={() => retryAttachment(att.id)}
+                    disabled={busy}
+                    className="inline-flex items-center gap-1 text-red-700 hover:underline"
+                    aria-label={`Reintentar ${att.filename}`}
+                  >
+                    <RefreshCw size={12} /> Reintentar
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => removeAttachment(att.url)}
+                  onClick={() => removeAttachment(att.id)}
                   disabled={busy}
-                  className="text-stone-500 hover:text-red-600"
+                  className="text-stone-500 hover:text-red-600 disabled:opacity-40"
                   aria-label={`Quitar ${att.filename}`}
                 >
                   <X size={12} />
@@ -367,7 +496,7 @@ export default function MailComposer({
               type="file"
               multiple
               className="hidden"
-              onChange={(e) => handleAttach(e.target.files)}
+              onChange={(e) => addFiles(e.target.files)}
             />
             <Button
               variant="ghost"
@@ -378,14 +507,29 @@ export default function MailComposer({
               <Paperclip size={15} className="mr-1.5" />
               {uploading ? "Subiendo…" : "Adjuntar"}
             </Button>
-            {success && (
-              <span className="truncate text-xs text-green-600">
-                Mensaje enviado correctamente.
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => void saveDraft()}
+              disabled={busy || !hasContent}
+            >
+              <Save size={15} className="mr-1.5" />
+              Guardar borrador
+            </Button>
+            {saveState === "saving" && (
+              <span className="text-xs text-stone-500">Guardando…</span>
+            )}
+            {saveState === "saved" && (
+              <span className="inline-flex items-center gap-1 text-xs text-green-600">
+                <Check size={12} /> Borrador guardado
               </span>
             )}
-            {error && (
-              <span className="truncate text-xs text-red-600">{error}</span>
+            {saveState === "error" && (
+              <span className="inline-flex items-center gap-1 text-xs text-red-600">
+                <AlertTriangle size={12} /> No se pudo guardar
+              </span>
             )}
+            {error && <span className="truncate text-xs text-red-600">{error}</span>}
           </div>
 
           <div className="flex shrink-0 items-center gap-3">
@@ -403,6 +547,45 @@ export default function MailComposer({
           </div>
         </footer>
       </div>
+
+      <Dialog.Root open={closePrompt} onOpenChange={setClosePrompt}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-[60] bg-stone-900/40 backdrop-blur-sm" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-[61] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border bg-white p-5 shadow-2xl focus:outline-none">
+            <Dialog.Title className="text-base font-semibold text-stone-900">
+              ¿Guardar cambios?
+            </Dialog.Title>
+            <Dialog.Description className="mt-2 text-sm text-stone-600">
+              El mensaje tiene cambios sin enviar.
+            </Dialog.Description>
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setClosePrompt(false)}
+              >
+                Seguir editando
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => void discardAndClose()}
+              >
+                Descartar
+              </Button>
+              <Button
+                size="sm"
+                onClick={async () => {
+                  await saveDraft();
+                  onClose();
+                }}
+              >
+                Guardar borrador
+              </Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }

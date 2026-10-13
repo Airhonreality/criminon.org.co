@@ -9,6 +9,8 @@ export interface ComposeInit {
   html: string;
   inReplyTo: string | null;
   references: string | null;
+  /** Si proviene de un borrador existente (edición). */
+  draftId?: string | null;
 }
 
 function escapeHtml(input: string): string {
