@@ -4,6 +4,7 @@ import {
   Mail,
   Pencil,
   RotateCcw,
+  Search,
   ShieldAlert,
   Star,
   Trash2,
@@ -65,6 +66,11 @@ export default function MailToolbar({
   onClearSelection,
   onBulk,
   onEmptyTrash,
+  query,
+  searching,
+  onQueryChange,
+  onSearchSubmit,
+  onClearSearch,
 }: {
   folder: MailFolder;
   count: number;
@@ -76,6 +82,11 @@ export default function MailToolbar({
   onClearSelection: () => void;
   onBulk: (action: BulkAction) => void;
   onEmptyTrash: () => void;
+  query: string;
+  searching: boolean;
+  onQueryChange: (value: string) => void;
+  onSearchSubmit: () => void;
+  onClearSearch: () => void;
 }) {
   if (selectedCount > 0) {
     return (
@@ -103,15 +114,52 @@ export default function MailToolbar({
   }
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border bg-card p-3">
-      <span className="text-sm text-muted-foreground">
-        {folderLabel(folder)} ·{" "}
-        {loading && count === 0
-          ? "Cargando…"
-          : `${count} mensaje${count === 1 ? "" : "s"}`}
-      </span>
+    <div className="flex flex-col gap-2 rounded-md border bg-card p-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex min-w-0 flex-1 items-center">
+        <div className="relative w-full min-w-0 lg:max-w-md">
+          <Search
+            size={15}
+            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400"
+          />
+          <input
+            value={query}
+            onChange={(e) => onQueryChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                onSearchSubmit();
+              } else if (e.key === "Escape") {
+                onClearSearch();
+              }
+            }}
+            placeholder="Buscar en el correo…"
+            aria-label="Buscar mensajes"
+            className="w-full rounded-md border bg-white py-1.5 pl-8 pr-8 text-sm outline-none placeholder:text-stone-400 focus:ring-2 focus:ring-stone-300"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={onClearSearch}
+              aria-label="Limpiar búsqueda"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      </div>
+
       <div className="flex items-center gap-2">
-        {folder === "TRASH" && count > 0 && (
+        <span className="mr-auto text-xs text-muted-foreground lg:mr-0">
+          {searching
+            ? "Búsqueda"
+            : folderLabel(folder)}{" "}
+          ·{" "}
+          {loading && count === 0
+            ? "Cargando…"
+            : `${count} mensaje${count === 1 ? "" : "s"}`}
+        </span>
+        {folder === "TRASH" && !searching && count > 0 && (
           <Button size="sm" variant="outline" onClick={onEmptyTrash}>
             Vaciar papelera
           </Button>

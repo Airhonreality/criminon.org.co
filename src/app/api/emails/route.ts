@@ -69,6 +69,7 @@ export async function GET(request: Request) {
     const q = searchParams.get("q")?.trim() || "";
     const unread = searchParams.get("unread");
     const starred = searchParams.get("starred");
+    const all = searchParams.get("all") === "true";
     const page = Math.max(1, Number(searchParams.get("page")) || 1);
     const limit = Math.min(
       100,
@@ -79,7 +80,8 @@ export async function GET(request: Request) {
     const whereConditions = [];
 
     // La vista Starred ignora la carpeta y muestra destacados de cualquier carpeta.
-    if (starred !== "true") {
+    // `all=true` (búsqueda global) tampoco filtra por carpeta.
+    if (!all && starred !== "true") {
       whereConditions.push(sql`folder = ${folder}`);
     }
 

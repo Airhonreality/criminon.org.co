@@ -10,7 +10,13 @@ import MailReader from "./MailReader";
 import MailComposer from "./MailComposer";
 import ConfirmDialog from "./ConfirmDialog";
 import { fetchMailList, mailApi } from "./api";
-import { buildForward, buildReply, buildReplyAll, type ComposeInit } from "./compose";
+import {
+  buildDraftInit,
+  buildForward,
+  buildReply,
+  buildReplyAll,
+  type ComposeInit,
+} from "./compose";
 import {
   bulkTargetFolder,
   type BulkAction,
@@ -46,6 +52,8 @@ export default function MailApp({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [queryInput, setQueryInput] = useState("");
+  const [query, setQuery] = useState("");
   const [composer, setComposer] = useState<{
     open: boolean;
     init: ComposeInit | null;
@@ -83,11 +91,6 @@ export default function MailApp({
     []
   );
 
-  const closeCompose = useCallback(
-    () => setComposer((c) => ({ ...c, open: false })),
-    []
-  );
-
   const load = useCallback(
     async ({ silent = false }: { silent?: boolean } = {}) => {
       if (silent) setRefreshing(true);
@@ -96,7 +99,9 @@ export default function MailApp({
         setError(null);
       }
       try {
-        const result = await fetchMailList({ folder });
+        const result = await fetchMailList(
+          query ? { q: query, all: true } : { folder }
+        );
         setEmails(result.data);
         setError(null);
       } catch (e) {
@@ -109,16 +114,23 @@ export default function MailApp({
         else setLoading(false);
       }
     },
-    [folder, notify]
+    [folder, query, notify]
   );
 
-  // Carga al montar y al cambiar de carpeta. El setState ocurre sólo tras el
-  // await (no de forma síncrona en el cuerpo del efecto).
+  const closeCompose = useCallback(() => {
+    setComposer((c) => ({ ...c, open: false }));
+    if (folder === "DRAFTS") void load({ silent: true });
+  }, [folder, load]);
+
+  // Carga al montar y al cambiar de carpeta o de búsqueda. El setState ocurre
+  // sólo tras el await (no de forma síncrona en el cuerpo del efecto).
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const result = await fetchMailList({ folder });
+        const result = await fetchMailList(
+          query ? { q: query, all: true } : { folder }
+        );
         if (!cancelled) {
           setEmails(result.data);
           setError(null);
@@ -136,7 +148,7 @@ export default function MailApp({
     return () => {
       cancelled = true;
     };
-  }, [folder]);
+  }, [folder, query]);
 
   const runOptimistic = useCallback(
     async (
@@ -163,24 +175,51 @@ export default function MailApp({
   const selected = emails.find((e) => e.id === selectedId) ?? null;
 
   const selectFolder = (f: MailFolder) => {
-    if (f === folder) {
-      void load({ silent: true });
-      return;
-    }
     setSelectedId(null);
     setSelectedIds(new Set());
+    setQueryInput("");
+    if (f === folder) {
+      if (query) {
+        setLoading(true);
+        setQuery("");
+      } else {
+        void load({ silent: true });
+      }
+      return;
+    }
     setLoading(true);
     setError(null);
+    setQuery("");
     setFolder(f);
   };
 
   const openEmail = (email: MailEmail) => {
+    if (folder === "DRAFTS") {
+      openCompose(buildDraftInit(email));
+      return;
+    }
     setSelectedId(email.id);
     if (!email.isRead) {
       void runOptimistic(
         (prev) => prev.map((e) => (e.id === email.id ? { ...e, isRead: true } : e)),
         () => mailApi.markRead([email.id])
       );
+    }
+  };
+
+  const submitSearch = () => {
+    const term = queryInput.trim();
+    setSelectedId(null);
+    setSelectedIds(new Set());
+    setQuery(term);
+    if (term) setLoading(true);
+  };
+
+  const clearSearch = () => {
+    setQueryInput("");
+    if (query) {
+      setQuery("");
+      setLoading(true);
     }
   };
 
@@ -369,6 +408,8 @@ export default function MailApp({
     setSelectedId(null);
     setSelectedIds(new Set());
     setError(null);
+    setQueryInput("");
+    setQuery("");
     if (folder === "SENT") void load({ silent: true });
     else {
       setLoading(true);
@@ -393,6 +434,11 @@ export default function MailApp({
             onClearSelection={() => setSelectedIds(new Set())}
             onBulk={handleBulk}
             onEmptyTrash={confirmEmptyTrash}
+            query={queryInput}
+            searching={Boolean(query)}
+            onQueryChange={setQueryInput}
+            onSearchSubmit={submitSearch}
+            onClearSearch={clearSearch}
           />
 
           {selected ? (
@@ -434,6 +480,7 @@ export default function MailApp({
               refreshing={refreshing}
               error={error}
               folder={folder}
+              searching={Boolean(query)}
               selectedIds={selectedIds}
               onOpen={openEmail}
               onToggleSelect={toggleSelect}

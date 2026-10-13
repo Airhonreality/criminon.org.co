@@ -29,13 +29,15 @@ export async function fetchMailList(params: {
   folder?: MailFolder;
   starred?: boolean;
   q?: string;
+  all?: boolean;
   unread?: boolean;
   page?: number;
   limit?: number;
   signal?: AbortSignal;
 }): Promise<MailListResult> {
   const search = new URLSearchParams();
-  if (params.starred) search.set("starred", "true");
+  if (params.all) search.set("all", "true");
+  else if (params.starred) search.set("starred", "true");
   else if (params.folder) search.set("folder", params.folder);
   if (params.q) search.set("q", params.q);
   if (params.unread !== undefined) search.set("unread", String(params.unread));

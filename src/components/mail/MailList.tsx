@@ -25,6 +25,7 @@ export default function MailList({
   refreshing,
   error,
   folder,
+  searching,
   selectedIds,
   onOpen,
   onToggleSelect,
@@ -37,6 +38,7 @@ export default function MailList({
   refreshing: boolean;
   error: string | null;
   folder: MailFolder;
+  searching: boolean;
   selectedIds: Set<string>;
   onOpen: (email: MailEmail) => void;
   onToggleSelect: (id: string) => void;
@@ -66,7 +68,9 @@ export default function MailList({
   if (emails.length === 0) {
     return (
       <div className="rounded-md border bg-card p-8 text-center">
-        <p className="text-sm text-muted-foreground">{emptyMessage(folder)}</p>
+        <p className="text-sm text-muted-foreground">
+          {searching ? "No se encontraron mensajes." : emptyMessage(folder)}
+        </p>
       </div>
     );
   }

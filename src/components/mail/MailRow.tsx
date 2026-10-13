@@ -66,7 +66,11 @@ export default function MailRow({
           }}
           aria-label={email.isStarred ? "Quitar destacado" : "Destacar"}
           aria-pressed={email.isStarred}
-          className="mt-0.5 shrink-0 rounded p-0.5 text-stone-300 transition-colors hover:text-amber-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400"
+          className={cn(
+            "mt-0.5 shrink-0 rounded p-0.5 text-stone-300 transition-colors hover:text-amber-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400",
+            folder === "DRAFTS" && "invisible"
+          )}
+          tabIndex={folder === "DRAFTS" ? -1 : undefined}
         >
           <Star
             size={16}

@@ -129,6 +129,24 @@ export function buildReplyAll(email: MailEmail, ownAddress: string): ComposeInit
   };
 }
 
+/** Convierte un borrador almacenado en el estado inicial del composer. */
+export function buildDraftInit(email: MailEmail): ComposeInit {
+  return {
+    to: email.recipient || "",
+    cc: email.cc || "",
+    bcc: email.bcc || "",
+    subject: email.subject || "",
+    html:
+      email.bodyHtml ||
+      (email.bodyText
+        ? `<p>${escapeHtml(email.bodyText).replace(/\n/g, "<br>")}</p>`
+        : ""),
+    inReplyTo: email.inReplyTo ?? null,
+    references: email.references ?? null,
+    draftId: email.id,
+  };
+}
+
 export function buildForward(email: MailEmail): ComposeInit {
   const subject = stripSubjectPrefix(email.subject);
   const ccLine = email.cc ? `<br>CC: ${escapeHtml(email.cc)}` : "";
