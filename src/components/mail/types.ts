@@ -49,3 +49,55 @@ export function folderLabel(folder: MailFolder): string {
   const found = FOLDERS.find((f) => f.key === folder);
   return found ? found.label : folder;
 }
+
+export type BulkAction =
+  | "markRead"
+  | "markUnread"
+  | "star"
+  | "unstar"
+  | "archive"
+  | "spam"
+  | "notSpam"
+  | "trash"
+  | "restore"
+  | "delete"
+  | "discard";
+
+/** Carpeta destino de una acción de movimiento, o null si no aplica. */
+export function bulkTargetFolder(action: BulkAction): MailFolder | null {
+  switch (action) {
+    case "archive":
+      return "ARCHIVE";
+    case "spam":
+      return "SPAM";
+    case "trash":
+      return "TRASH";
+    case "restore":
+    case "notSpam":
+      return "INBOX";
+    default:
+      return null;
+  }
+}
+
+/** Etiquetas vacías por carpeta (no es un error). */
+export function emptyMessage(folder: MailFolder): string {
+  switch (folder) {
+    case "INBOX":
+      return "No hay mensajes en la bandeja de entrada.";
+    case "STARRED":
+      return "No hay mensajes destacados.";
+    case "SENT":
+      return "No hay mensajes enviados.";
+    case "DRAFTS":
+      return "No hay borradores.";
+    case "ARCHIVE":
+      return "No hay mensajes archivados.";
+    case "SPAM":
+      return "No hay mensajes en spam.";
+    case "TRASH":
+      return "La papelera está vacía.";
+    default:
+      return "No hay mensajes.";
+  }
+}

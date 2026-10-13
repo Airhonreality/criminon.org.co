@@ -1,14 +1,35 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AlertTriangle, Check } from "lucide-react";
 import MailHeader from "./MailHeader";
 import MailSidebar from "./MailSidebar";
 import MailToolbar from "./MailToolbar";
 import MailList from "./MailList";
 import MailReader from "./MailReader";
 import MailComposer from "./MailComposer";
+import ConfirmDialog from "./ConfirmDialog";
 import { fetchMailList, mailApi } from "./api";
-import type { MailEmail, MailFolder } from "./types";
+import {
+  bulkTargetFolder,
+  type BulkAction,
+  type MailEmail,
+  type MailFolder,
+} from "./types";
+
+interface Toast {
+  id: number;
+  kind: "success" | "error";
+  message: string;
+}
+
+interface ConfirmState {
+  title: string;
+  description?: string;
+  confirmLabel?: string;
+  destructive?: boolean;
+  onConfirm: () => void;
+}
 
 export default function MailApp({
   mailboxAddress,
@@ -20,33 +41,78 @@ export default function MailApp({
   const [folder, setFolder] = useState<MailFolder>("INBOX");
   const [emails, setEmails] = useState<MailEmail[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [toast, setToast] = useState<Toast | null>(null);
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await fetchMailList({ folder });
-      setEmails(result.data);
-    } catch {
-      setError("No se pudieron cargar los mensajes.");
-    } finally {
-      setLoading(false);
-    }
-  }, [folder]);
+  const emailsRef = useRef(emails);
+  useEffect(() => {
+    emailsRef.current = emails;
+  }, [emails]);
 
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const notify = useCallback(
+    (message: string, kind: "success" | "error" = "success") => {
+      setToast({ id: Date.now(), kind, message });
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!toast) return;
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 4500);
+    return () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    };
+  }, [toast]);
+
+  const load = useCallback(
+    async ({ silent = false }: { silent?: boolean } = {}) => {
+      if (silent) setRefreshing(true);
+      else {
+        setLoading(true);
+        setError(null);
+      }
+      try {
+        const result = await fetchMailList({ folder });
+        setEmails(result.data);
+        setError(null);
+      } catch (e) {
+        const message =
+          e instanceof Error ? e.message : "No se pudieron cargar los mensajes.";
+        if (silent) notify(message, "error");
+        else setError(message);
+      } finally {
+        if (silent) setRefreshing(false);
+        else setLoading(false);
+      }
+    },
+    [folder, notify]
+  );
+
+  // Carga al montar y al cambiar de carpeta. El setState ocurre sólo tras el
+  // await (no de forma síncrona en el cuerpo del efecto).
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setLoading(true);
-      setError(null);
       try {
         const result = await fetchMailList({ folder });
-        if (!cancelled) setEmails(result.data);
-      } catch {
-        if (!cancelled) setError("No se pudieron cargar los mensajes.");
+        if (!cancelled) {
+          setEmails(result.data);
+          setError(null);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(
+            e instanceof Error ? e.message : "No se pudieron cargar los mensajes."
+          );
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -56,86 +122,281 @@ export default function MailApp({
     };
   }, [folder]);
 
+  const runOptimistic = useCallback(
+    async (
+      mutate: (prev: MailEmail[]) => MailEmail[],
+      request: () => Promise<void>,
+      success?: string
+    ) => {
+      const snapshot = emailsRef.current;
+      setEmails(mutate);
+      try {
+        await request();
+        if (success) notify(success, "success");
+      } catch (e) {
+        setEmails(snapshot);
+        notify(
+          e instanceof Error ? e.message : "No se pudo completar la acción",
+          "error"
+        );
+      }
+    },
+    [notify]
+  );
+
   const selected = emails.find((e) => e.id === selectedId) ?? null;
 
   const selectFolder = (f: MailFolder) => {
-    setFolder(f);
+    if (f === folder) {
+      void load({ silent: true });
+      return;
+    }
     setSelectedId(null);
+    setSelectedIds(new Set());
     setLoading(true);
     setError(null);
+    setFolder(f);
   };
 
   const openEmail = (email: MailEmail) => {
     setSelectedId(email.id);
     if (!email.isRead) {
-      setEmails((prev) =>
-        prev.map((e) => (e.id === email.id ? { ...e, isRead: true } : e))
+      void runOptimistic(
+        (prev) => prev.map((e) => (e.id === email.id ? { ...e, isRead: true } : e)),
+        () => mailApi.markRead([email.id])
       );
-      mailApi.markRead([email.id]).catch(() => {});
     }
-  };
-
-  const moveEmail = (id: string, target: MailFolder) => {
-    setEmails((prev) => prev.filter((e) => e.id !== id));
-    setSelectedId(null);
-    mailApi.move([id], target).catch(() => {});
   };
 
   const toggleStar = (email: MailEmail) => {
     const next = !email.isStarred;
-    if (folder === "STARRED" && !next) {
-      setEmails((prev) => prev.filter((e) => e.id !== email.id));
-      setSelectedId(null);
-    } else {
-      setEmails((prev) =>
-        prev.map((e) => (e.id === email.id ? { ...e, isStarred: next } : e))
-      );
+    void runOptimistic(
+      (prev) =>
+        folder === "STARRED" && !next
+          ? prev.filter((e) => e.id !== email.id)
+          : prev.map((e) => (e.id === email.id ? { ...e, isStarred: next } : e)),
+      () => (next ? mailApi.star([email.id]) : mailApi.unstar([email.id])),
+      next ? "Marcado como destacado" : "Destacado eliminado"
+    );
+  };
+
+  const moveEmails = useCallback(
+    (ids: string[], target: MailFolder) => {
+      if (ids.length === 0) return;
+      const snapshot = emailsRef.current;
+      if (folder !== "STARRED") {
+        setEmails((prev) => prev.filter((e) => !ids.includes(e.id)));
+      }
+      if (selectedId && ids.includes(selectedId)) setSelectedId(null);
+      mailApi
+        .move(ids, target)
+        .then(async () => {
+          notify(
+            ids.length === 1
+              ? "Mensaje movido"
+              : `${ids.length} mensajes movidos`,
+            "success"
+          );
+          if (folder === "STARRED") await load({ silent: true });
+        })
+        .catch((e) => {
+          setEmails(snapshot);
+          notify(
+            e instanceof Error ? e.message : "No se pudo mover el mensaje",
+            "error"
+          );
+        });
+    },
+    [folder, selectedId, load, notify]
+  );
+
+  const deleteEmails = useCallback(
+    (ids: string[]) => {
+      if (ids.length === 0) return;
+      const snapshot = emailsRef.current;
+      setEmails((prev) => prev.filter((e) => !ids.includes(e.id)));
+      if (selectedId && ids.includes(selectedId)) setSelectedId(null);
+      mailApi
+        .remove(ids)
+        .then((n) =>
+          notify(
+            n === 1 ? "Mensaje eliminado" : `${n} mensajes eliminados`,
+            "success"
+          )
+        )
+        .catch((e) => {
+          setEmails(snapshot);
+          notify(
+            e instanceof Error ? e.message : "No se pudieron eliminar",
+            "error"
+          );
+        });
+    },
+    [selectedId, notify]
+  );
+
+  const handleBulk = (action: BulkAction) => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    setSelectedIds(new Set());
+
+    if (action === "delete" || action === "discard") {
+      setConfirm({
+        title:
+          action === "discard"
+            ? "¿Descartar borrador(es)?"
+            : "¿Eliminar permanentemente?",
+        description:
+          action === "discard"
+            ? "Se eliminarán los borradores seleccionados. Esta acción no se puede deshacer."
+            : "Se eliminarán los mensajes seleccionados de forma permanente. Esta acción no se puede deshacer.",
+        confirmLabel: action === "discard" ? "Descartar" : "Eliminar",
+        destructive: true,
+        onConfirm: () => deleteEmails(ids),
+      });
+      return;
     }
-    (next ? mailApi.star([email.id]) : mailApi.unstar([email.id])).catch(() => {});
+
+    const target = bulkTargetFolder(action);
+    if (target) {
+      moveEmails(ids, target);
+      return;
+    }
+
+    switch (action) {
+      case "markRead":
+        void runOptimistic(
+          (prev) => prev.map((e) => (ids.includes(e.id) ? { ...e, isRead: true } : e)),
+          () => mailApi.markRead(ids),
+          "Marcados como leídos"
+        );
+        break;
+      case "markUnread":
+        void runOptimistic(
+          (prev) => prev.map((e) => (ids.includes(e.id) ? { ...e, isRead: false } : e)),
+          () => mailApi.markUnread(ids),
+          "Marcados como no leídos"
+        );
+        break;
+      case "star":
+        void runOptimistic(
+          (prev) =>
+            prev.map((e) => (ids.includes(e.id) ? { ...e, isStarred: true } : e)),
+          () => mailApi.star(ids),
+          "Marcados como destacados"
+        );
+        break;
+      case "unstar":
+        void runOptimistic(
+          (prev) =>
+            folder === "STARRED"
+              ? prev.filter((e) => !ids.includes(e.id))
+              : prev.map((e) =>
+                  ids.includes(e.id) ? { ...e, isStarred: false } : e
+                ),
+          () => mailApi.unstar(ids),
+          "Destacados eliminados"
+        );
+        break;
+    }
+  };
+
+  const confirmEmptyTrash = () => {
+    setConfirm({
+      title: "¿Vaciar la papelera?",
+      description:
+        "Se eliminarán permanentemente todos los mensajes de la papelera. Esta acción no se puede deshacer.",
+      confirmLabel: "Vaciar papelera",
+      destructive: true,
+      onConfirm: () => {
+        const snapshot = emailsRef.current;
+        setEmails([]);
+        setSelectedId(null);
+        mailApi
+          .emptyTrash()
+          .then((n) => notify(`${n} mensajes eliminados`, "success"))
+          .catch((e) => {
+            setEmails(snapshot);
+            notify(
+              e instanceof Error ? e.message : "No se pudo vaciar la papelera",
+              "error"
+            );
+          });
+      },
+    });
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) =>
+      prev.size === emails.length && emails.length > 0
+        ? new Set()
+        : new Set(emails.map((e) => e.id))
+    );
   };
 
   const handleSent = () => {
     setSelectedId(null);
+    setSelectedIds(new Set());
     setError(null);
-    if (folder === "SENT") {
-      void load();
-    } else {
-      setFolder("SENT");
+    if (folder === "SENT") void load({ silent: true });
+    else {
       setLoading(true);
+      setFolder("SENT");
     }
   };
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
+    <div className="min-h-screen bg-background p-3 md:p-6">
       <MailHeader folder={folder} name={mailboxName} address={mailboxAddress} />
-      <div className="flex flex-col md:flex-row gap-4">
+      <div className="flex flex-col gap-4 md:flex-row">
         <MailSidebar folder={folder} onSelectFolder={selectFolder} />
-        <div className="flex-1 flex flex-col gap-4 min-w-0">
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
           <MailToolbar
             folder={folder}
             count={emails.length}
             loading={loading}
-            onRefresh={load}
+            refreshing={refreshing}
+            selectedCount={selectedIds.size}
+            onRefresh={() => load({ silent: true })}
             onCompose={() => setComposerOpen(true)}
+            onClearSelection={() => setSelectedIds(new Set())}
+            onBulk={handleBulk}
+            onEmptyTrash={confirmEmptyTrash}
           />
+
           {selected ? (
             <MailReader
               email={selected}
               folder={folder}
               onBack={() => setSelectedId(null)}
               onToggleStar={() => toggleStar(selected)}
-              onMove={(target) => moveEmail(selected.id, target)}
+              onMove={(target) => moveEmails([selected.id], target)}
             />
           ) : (
             <MailList
               emails={emails}
               loading={loading}
+              refreshing={refreshing}
               error={error}
               folder={folder}
-              onSelect={openEmail}
-              onRetry={load}
+              selectedIds={selectedIds}
+              onOpen={openEmail}
+              onToggleSelect={toggleSelect}
+              onToggleSelectAll={toggleSelectAll}
+              onToggleStar={toggleStar}
+              onRetry={() => load()}
             />
           )}
+
           <MailComposer
             open={composerOpen}
             onClose={() => setComposerOpen(false)}
@@ -143,6 +404,45 @@ export default function MailApp({
           />
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirm !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirm(null);
+        }}
+        title={confirm?.title ?? ""}
+        description={confirm?.description}
+        confirmLabel={confirm?.confirmLabel}
+        destructive={confirm?.destructive}
+        onConfirm={() => confirm?.onConfirm()}
+      />
+
+      {toast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`fixed bottom-4 left-1/2 z-[70] flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-2 rounded-lg border px-4 py-2.5 text-sm shadow-lg ${
+            toast.kind === "error"
+              ? "border-red-200 bg-red-50 text-red-800"
+              : "border-stone-200 bg-white text-stone-800"
+          }`}
+        >
+          {toast.kind === "error" ? (
+            <AlertTriangle size={16} className="shrink-0" />
+          ) : (
+            <Check size={16} className="shrink-0 text-green-600" />
+          )}
+          <span>{toast.message}</span>
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            aria-label="Cerrar aviso"
+            className="ml-1 text-stone-400 hover:text-stone-700"
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   );
 }
