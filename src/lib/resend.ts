@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { mailboxFrom } from "@/lib/mailbox";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -17,6 +18,7 @@ export async function sendEmail({
   cc,
   bcc,
   replyTo,
+  headers,
   attachments,
 }: {
   to: string | string[];
@@ -26,10 +28,11 @@ export async function sendEmail({
   cc?: string | string[];
   bcc?: string | string[];
   replyTo?: string;
+  headers?: Record<string, string>;
   attachments?: OutgoingAttachment[];
 }) {
   return await resend.emails.send({
-    from: "Contacto <contacto@criminoncolombia.org>",
+    from: mailboxFrom,
     to,
     subject,
     html,
@@ -37,6 +40,7 @@ export async function sendEmail({
     ...(cc ? { cc } : {}),
     ...(bcc ? { bcc } : {}),
     ...(replyTo ? { replyTo } : {}),
+    ...(headers && Object.keys(headers).length > 0 ? { headers } : {}),
     ...(attachments && attachments.length > 0 ? { attachments } : {}),
   });
 }

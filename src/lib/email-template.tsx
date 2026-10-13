@@ -13,8 +13,10 @@ import {
 } from "@react-email/components";
 import { render } from "@react-email/render";
 
+import { mailboxAddress } from "@/lib/mailbox";
+
 const BRAND = "Criminon Colombia";
-const FROM_EMAIL = "contacto@criminoncolombia.org";
+const FROM_EMAIL = mailboxAddress;
 const SITE_URL = "https://criminoncolombia.org";
 
 const DEFAULT_SIGNATURE = `Saludos cordiales,

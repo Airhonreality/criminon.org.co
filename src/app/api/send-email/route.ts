@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { emails } from "@/db/schema";
 import { sendEmail } from "@/lib/resend";
 import { renderEmail } from "@/lib/email-template";
+import { mailboxFrom } from "@/lib/mailbox";
 
 function escapeHtml(input: string): string {
   return input
@@ -75,6 +76,15 @@ export async function POST(request: Request) {
       bodyHtml,
     });
 
+    const inReplyTo =
+      typeof body.inReplyTo === "string" ? body.inReplyTo.trim() : "";
+    const references =
+      typeof body.references === "string" ? body.references.trim() : "";
+
+    const headers: Record<string, string> = {};
+    if (inReplyTo) headers["In-Reply-To"] = inReplyTo;
+    if (references) headers["References"] = references;
+
     const result = await sendEmail({
       to,
       subject,
@@ -83,6 +93,7 @@ export async function POST(request: Request) {
       cc: cc.length ? cc : undefined,
       bcc: bcc.length ? bcc : undefined,
       replyTo: typeof body.replyTo === "string" ? body.replyTo : undefined,
+      headers: Object.keys(headers).length ? headers : undefined,
       attachments: attachments.length
         ? attachments.map((a) => ({
             filename: a.filename,
@@ -105,7 +116,7 @@ export async function POST(request: Request) {
     try {
       await db.insert(emails).values({
         messageId,
-        sender: "Contacto <contacto@criminoncolombia.org>",
+        sender: mailboxFrom,
         recipient: to.join(", "),
         cc: cc.length ? cc.join(", ") : null,
         bcc: bcc.length ? bcc.join(", ") : null,
@@ -115,7 +126,9 @@ export async function POST(request: Request) {
         attachments,
         direction: "OUTBOUND",
         folder: "SENT",
-        isRead: false,
+        isRead: true,
+        inReplyTo: inReplyTo || null,
+        references: references || null,
       });
     } catch (dbError) {
       // El correo ya se envió; no debe reportarse como fallo.

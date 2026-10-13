@@ -1,27 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import MailHeader from "./MailHeader";
 import MailSidebar from "./MailSidebar";
 import MailToolbar from "./MailToolbar";
 import MailList from "./MailList";
 import MailReader from "./MailReader";
 import MailComposer from "./MailComposer";
+import { fetchMailList, mailApi } from "./api";
 import type { MailEmail, MailFolder } from "./types";
 
-async function fetchEmails(folder: MailFolder): Promise<MailEmail[]> {
-  const params = new URLSearchParams();
-  if (folder === "STARRED") params.set("starred", "true");
-  else params.set("folder", folder);
-  const res = await fetch(`/api/emails?${params.toString()}`, {
-    credentials: "include",
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Error al cargar");
-  return (data.data as MailEmail[]) || [];
-}
-
-export default function MailApp() {
+export default function MailApp({
+  mailboxAddress,
+  mailboxName,
+}: {
+  mailboxAddress: string;
+  mailboxName: string;
+}) {
   const [folder, setFolder] = useState<MailFolder>("INBOX");
   const [emails, setEmails] = useState<MailEmail[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -29,12 +24,27 @@ export default function MailApp() {
   const [error, setError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
 
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await fetchMailList({ folder });
+      setEmails(result.data);
+    } catch {
+      setError("No se pudieron cargar los mensajes.");
+    } finally {
+      setLoading(false);
+    }
+  }, [folder]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      setLoading(true);
+      setError(null);
       try {
-        const data = await fetchEmails(folder);
-        if (!cancelled) setEmails(data);
+        const result = await fetchMailList({ folder });
+        if (!cancelled) setEmails(result.data);
       } catch {
         if (!cancelled) setError("No se pudieron cargar los mensajes.");
       } finally {
@@ -55,49 +65,24 @@ export default function MailApp() {
     setError(null);
   };
 
-  const handleRefresh = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setEmails(await fetchEmails(folder));
-    } catch {
-      setError("No se pudieron cargar los mensajes.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const openEmail = (email: MailEmail) => {
     setSelectedId(email.id);
     if (!email.isRead) {
       setEmails((prev) =>
         prev.map((e) => (e.id === email.id ? { ...e, isRead: true } : e))
       );
-      fetch("/api/emails", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: email.id, isRead: true }),
-      }).catch(() => {});
+      mailApi.markRead([email.id]).catch(() => {});
     }
   };
 
   const moveEmail = (id: string, target: MailFolder) => {
     setEmails((prev) => prev.filter((e) => e.id !== id));
     setSelectedId(null);
-    fetch("/api/emails", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, folder: target }),
-    }).catch(() => {});
+    mailApi.move([id], target).catch(() => {});
   };
 
   const toggleStar = (email: MailEmail) => {
     const next = !email.isStarred;
-    fetch("/api/emails", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: email.id, isStarred: next }),
-    }).catch(() => {});
     if (folder === "STARRED" && !next) {
       setEmails((prev) => prev.filter((e) => e.id !== email.id));
       setSelectedId(null);
@@ -106,13 +91,14 @@ export default function MailApp() {
         prev.map((e) => (e.id === email.id ? { ...e, isStarred: next } : e))
       );
     }
+    (next ? mailApi.star([email.id]) : mailApi.unstar([email.id])).catch(() => {});
   };
 
   const handleSent = () => {
     setSelectedId(null);
     setError(null);
     if (folder === "SENT") {
-      void handleRefresh();
+      void load();
     } else {
       setFolder("SENT");
       setLoading(true);
@@ -121,7 +107,7 @@ export default function MailApp() {
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
-      <MailHeader folder={folder} />
+      <MailHeader folder={folder} name={mailboxName} address={mailboxAddress} />
       <div className="flex flex-col md:flex-row gap-4">
         <MailSidebar folder={folder} onSelectFolder={selectFolder} />
         <div className="flex-1 flex flex-col gap-4 min-w-0">
@@ -129,7 +115,7 @@ export default function MailApp() {
             folder={folder}
             count={emails.length}
             loading={loading}
-            onRefresh={handleRefresh}
+            onRefresh={load}
             onCompose={() => setComposerOpen(true)}
           />
           {selected ? (
@@ -147,7 +133,7 @@ export default function MailApp() {
               error={error}
               folder={folder}
               onSelect={openEmail}
-              onRetry={handleRefresh}
+              onRetry={load}
             />
           )}
           <MailComposer

@@ -231,12 +231,14 @@ export const emails = pgTable(
     isRead: boolean("is_read").notNull().default(false),
     isStarred: boolean("is_starred").notNull().default(false),
     inReplyTo: varchar("in_reply_to", { length: 255 }),
-    references: varchar("references", { length: 255 }),
+    references: text("references"),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (t) => [
     index("emails_direction_idx").on(t.direction),
     index("emails_created_at_idx").on(t.createdAt),
+    index("emails_folder_idx").on(t.folder),
+    index("emails_starred_idx").on(t.isStarred),
     check("emails_direction_check", sql`direction IN ('INBOUND', 'OUTBOUND')`),
   ]
 );

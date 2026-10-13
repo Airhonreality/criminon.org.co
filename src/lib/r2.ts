@@ -7,7 +7,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const accountId = process.env.R2_ACCOUNT_ID;
 const bucket = process.env.R2_BUCKET;
-const publicBase = process.env.R2_PUBLIC_URL?.replace(/\/+$/, "");
+const publicBase = process.env.R2_PUBLIC_URL?.trim().replace(/\/+$/, "");
 
 let client: S3Client | null = null;
 
