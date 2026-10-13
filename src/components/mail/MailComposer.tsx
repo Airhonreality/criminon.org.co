@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { ComposeInit } from "./compose";
 
 const BlockEditor = dynamic(() => import("./BlockEditor"), {
   ssr: false,
@@ -70,21 +71,27 @@ async function uploadToR2(file: File): Promise<Attachment> {
 
 export default function MailComposer({
   open,
+  initial,
   onClose,
   onSent,
 }: {
   open: boolean;
+  initial?: ComposeInit | null;
   onClose: () => void;
   onSent: () => void;
 }) {
-  const [to, setTo] = useState("");
-  const [cc, setCc] = useState("");
-  const [bcc, setBcc] = useState("");
-  const [showCcBcc, setShowCcBcc] = useState(false);
-  const [subject, setSubject] = useState("");
-  const [html, setHtml] = useState("");
+  const [to, setTo] = useState(initial?.to ?? "");
+  const [cc, setCc] = useState(initial?.cc ?? "");
+  const [bcc, setBcc] = useState(initial?.bcc ?? "");
+  const [showCcBcc, setShowCcBcc] = useState(
+    Boolean(initial?.cc || initial?.bcc)
+  );
+  const [subject, setSubject] = useState(initial?.subject ?? "");
+  const [html, setHtml] = useState(initial?.html ?? "");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [editorKey, setEditorKey] = useState(0);
+  const inReplyTo = initial?.inReplyTo ?? null;
+  const references = initial?.references ?? null;
   const [expanded, setExpanded] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [sending, setSending] = useState(false);
@@ -147,7 +154,16 @@ export default function MailComposer({
       const res = await fetch("/api/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to, cc, bcc, subject, html, attachments }),
+        body: JSON.stringify({
+          to,
+          cc,
+          bcc,
+          subject,
+          html,
+          attachments,
+          inReplyTo,
+          references,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -312,6 +328,7 @@ export default function MailComposer({
             key={editorKey}
             onChange={setHtml}
             uploadFile={handleEditorUpload}
+            initialHtml={initial?.html}
           />
         </div>
 

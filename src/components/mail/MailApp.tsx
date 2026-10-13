@@ -10,6 +10,7 @@ import MailReader from "./MailReader";
 import MailComposer from "./MailComposer";
 import ConfirmDialog from "./ConfirmDialog";
 import { fetchMailList, mailApi } from "./api";
+import { buildForward, buildReply, buildReplyAll, type ComposeInit } from "./compose";
 import {
   bulkTargetFolder,
   type BulkAction,
@@ -45,7 +46,11 @@ export default function MailApp({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [composerOpen, setComposerOpen] = useState(false);
+  const [composer, setComposer] = useState<{
+    open: boolean;
+    init: ComposeInit | null;
+    nonce: number;
+  }>({ open: false, init: null, nonce: 0 });
   const [toast, setToast] = useState<Toast | null>(null);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
 
@@ -71,6 +76,17 @@ export default function MailApp({
       if (toastTimer.current) clearTimeout(toastTimer.current);
     };
   }, [toast]);
+
+  const openCompose = useCallback(
+    (init: ComposeInit | null = null) =>
+      setComposer((c) => ({ open: true, init, nonce: c.nonce + 1 })),
+    []
+  );
+
+  const closeCompose = useCallback(
+    () => setComposer((c) => ({ ...c, open: false })),
+    []
+  );
 
   const load = useCallback(
     async ({ silent = false }: { silent?: boolean } = {}) => {
@@ -235,25 +251,31 @@ export default function MailApp({
     [selectedId, notify]
   );
 
+  const requestDelete = useCallback(
+    (ids: string[], opts: { discard?: boolean } = {}) => {
+      if (ids.length === 0) return;
+      setConfirm({
+        title: opts.discard
+          ? "¿Descartar borrador(es)?"
+          : "¿Eliminar permanentemente?",
+        description: opts.discard
+          ? "Se eliminarán los borradores seleccionados. Esta acción no se puede deshacer."
+          : "Se eliminarán los mensajes seleccionados de forma permanente. Esta acción no se puede deshacer.",
+        confirmLabel: opts.discard ? "Descartar" : "Eliminar",
+        destructive: true,
+        onConfirm: () => deleteEmails(ids),
+      });
+    },
+    [deleteEmails]
+  );
+
   const handleBulk = (action: BulkAction) => {
     const ids = [...selectedIds];
     if (ids.length === 0) return;
     setSelectedIds(new Set());
 
     if (action === "delete" || action === "discard") {
-      setConfirm({
-        title:
-          action === "discard"
-            ? "¿Descartar borrador(es)?"
-            : "¿Eliminar permanentemente?",
-        description:
-          action === "discard"
-            ? "Se eliminarán los borradores seleccionados. Esta acción no se puede deshacer."
-            : "Se eliminarán los mensajes seleccionados de forma permanente. Esta acción no se puede deshacer.",
-        confirmLabel: action === "discard" ? "Descartar" : "Eliminar",
-        destructive: true,
-        onConfirm: () => deleteEmails(ids),
-      });
+      requestDelete(ids, { discard: action === "discard" });
       return;
     }
 
@@ -367,7 +389,7 @@ export default function MailApp({
             refreshing={refreshing}
             selectedCount={selectedIds.size}
             onRefresh={() => load({ silent: true })}
-            onCompose={() => setComposerOpen(true)}
+            onCompose={() => openCompose(null)}
             onClearSelection={() => setSelectedIds(new Set())}
             onBulk={handleBulk}
             onEmptyTrash={confirmEmptyTrash}
@@ -378,8 +400,32 @@ export default function MailApp({
               email={selected}
               folder={folder}
               onBack={() => setSelectedId(null)}
+              onReply={() => openCompose(buildReply(selected))}
+              onReplyAll={() =>
+                openCompose(buildReplyAll(selected, mailboxAddress))
+              }
+              onForward={() => openCompose(buildForward(selected))}
               onToggleStar={() => toggleStar(selected)}
               onMove={(target) => moveEmails([selected.id], target)}
+              onMarkRead={() =>
+                void runOptimistic(
+                  (prev) =>
+                    prev.map((e) =>
+                      e.id === selected.id ? { ...e, isRead: true } : e
+                    ),
+                  () => mailApi.markRead([selected.id])
+                )
+              }
+              onMarkUnread={() =>
+                void runOptimistic(
+                  (prev) =>
+                    prev.map((e) =>
+                      e.id === selected.id ? { ...e, isRead: false } : e
+                    ),
+                  () => mailApi.markUnread([selected.id])
+                )
+              }
+              onDelete={() => requestDelete([selected.id])}
             />
           ) : (
             <MailList
@@ -398,8 +444,10 @@ export default function MailApp({
           )}
 
           <MailComposer
-            open={composerOpen}
-            onClose={() => setComposerOpen(false)}
+            key={composer.nonce}
+            open={composer.open}
+            initial={composer.init}
+            onClose={closeCompose}
             onSent={handleSent}
           />
         </div>

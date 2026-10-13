@@ -67,9 +67,11 @@ function Divider() {
 export default function BlockEditor({
   onChange,
   uploadFile,
+  initialHtml,
 }: {
   onChange: (html: string) => void;
   uploadFile: (file: File) => Promise<string>;
+  initialHtml?: string;
 }) {
   const editor = useCreateBlockNote({
     dictionary: es,
@@ -81,6 +83,7 @@ export default function BlockEditor({
     type: "paragraph",
   });
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const initialised = useRef(false);
 
   const syncBlock = () => {
     const cur = editor.getTextCursorPosition().block;
@@ -99,17 +102,24 @@ export default function BlockEditor({
   useEditorSelectionChange(syncBlock, editor);
 
   // Enfoca el editor tras montar el DOM de ProseMirror (evita una carrera que
-  // lanzaba "Cannot read properties of null (reading 'setSelection')").
+  // lanzaba "Cannot read properties of null (reading 'setSelection')"). Si hay
+  // contenido inicial (respuesta/reenvío), lo inserta tras montar.
   useEffect(() => {
     const id = requestAnimationFrame(() => {
       try {
+        if (!initialised.current && initialHtml && initialHtml.trim()) {
+          const blocks = editor.tryParseHTMLToBlocks(initialHtml);
+          editor.replaceBlocks(editor.document, blocks);
+          onChange(editor.blocksToHTMLLossy(editor.document));
+        }
+        initialised.current = true;
         editor.focus();
       } catch {
         /* el editor aún no está listo; el usuario puede hacer clic */
       }
     });
     return () => cancelAnimationFrame(id);
-  }, [editor]);
+  }, [editor, initialHtml, onChange]);
 
   const applyType = (
     type: "paragraph" | "bulletListItem" | "numberedListItem" | "quote" | "codeBlock"
