@@ -15,7 +15,8 @@ export default function MailSidebar({
             <li key={f.key}>
               <button
                 onClick={() => onSelectFolder(f.key)}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                aria-current={folder === f.key ? "page" : undefined}
+                className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400 ${
                   folder === f.key
                     ? "bg-stone-900 text-stone-50"
                     : "hover:bg-stone-100 text-stone-700"

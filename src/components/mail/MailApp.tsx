@@ -8,6 +8,7 @@ import MailToolbar from "./MailToolbar";
 import MailList from "./MailList";
 import MailReader from "./MailReader";
 import MailComposer from "./MailComposer";
+import MailNavDrawer from "./MailNavDrawer";
 import ConfirmDialog from "./ConfirmDialog";
 import { fetchMailList, mailApi } from "./api";
 import {
@@ -417,11 +418,28 @@ export default function MailApp({
     }
   };
 
+  // Esc cierra el mensaje abierto (cuando no hay composer encima).
+  useEffect(() => {
+    if (!selectedId || composer.open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedId(null);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [selectedId, composer.open]);
+
   return (
     <div className="min-h-screen bg-background p-3 md:p-6">
-      <MailHeader folder={folder} name={mailboxName} address={mailboxAddress} />
+      <MailHeader
+        folder={folder}
+        name={mailboxName}
+        address={mailboxAddress}
+        nav={<MailNavDrawer folder={folder} onSelectFolder={selectFolder} />}
+      />
       <div className="flex flex-col gap-4 md:flex-row">
-        <MailSidebar folder={folder} onSelectFolder={selectFolder} />
+        <div className="hidden md:block">
+          <MailSidebar folder={folder} onSelectFolder={selectFolder} />
+        </div>
         <div className="flex min-w-0 flex-1 flex-col gap-4">
           <MailToolbar
             folder={folder}

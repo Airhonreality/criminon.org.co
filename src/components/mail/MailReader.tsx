@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   Archive,
@@ -99,18 +99,44 @@ export default function MailReader({
 }) {
   const attachments = Array.isArray(email.attachments) ? email.attachments : [];
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [frameHeight, setFrameHeight] = useState(240);
+  const observerRef = useRef<ResizeObserver | null>(null);
+  const [frameHeight, setFrameHeight] = useState(140);
 
-  const handleFrameLoad = () => {
+  const measure = useCallback(() => {
     try {
       const doc = iframeRef.current?.contentDocument;
-      if (doc?.body) {
-        setFrameHeight(Math.max(120, doc.body.scrollHeight + 16));
+      if (doc?.documentElement) {
+        const height = Math.max(
+          doc.documentElement.scrollHeight,
+          doc.body?.scrollHeight ?? 0
+        );
+        setFrameHeight(Math.max(140, height + 24));
       }
     } catch {
       /* sandbox impidió medir; se usa la altura por defecto */
     }
+  }, []);
+
+  // Tras cargar el iframe, medimos y observamos cambios (imágenes, fuentes,
+  // tablas) para que el cuerpo fluya en la UI en vez de quedar recortado.
+  const handleFrameLoad = () => {
+    const doc = iframeRef.current?.contentDocument;
+    if (!doc) return;
+    measure();
+    observerRef.current?.disconnect();
+    if (typeof ResizeObserver !== "undefined" && doc.body) {
+      const observer = new ResizeObserver(() => measure());
+      observer.observe(doc.body);
+      observerRef.current = observer;
+    }
+    doc.querySelectorAll("img").forEach((img) => {
+      if (!img.complete) img.addEventListener("load", measure, { once: true });
+    });
   };
+
+  useEffect(() => {
+    return () => observerRef.current?.disconnect();
+  }, []);
 
   const isDrafts = folder === "DRAFTS";
   const isSpam = folder === "SPAM";

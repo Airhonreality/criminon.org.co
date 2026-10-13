@@ -1,22 +1,30 @@
+import type { ReactNode } from "react";
 import { folderLabel, type MailFolder } from "./types";
 
 export default function MailHeader({
   folder,
   name,
   address,
+  nav,
 }: {
   folder: MailFolder;
   name: string;
   address: string;
+  nav?: ReactNode;
 }) {
   return (
-    <header className="border-b border-border bg-card p-4 md:p-6 mb-4 rounded-md">
-      <div className="flex items-center justify-between">
-        <div className="min-w-0">
-          <h1 className="text-xl font-medium">Mailbox · {name}</h1>
-          <p className="text-sm text-muted-foreground truncate">{address}</p>
+    <header className="mb-4 rounded-md border-b border-border bg-card p-3 md:p-6">
+      <div className="flex items-center gap-3">
+        {nav}
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-lg font-medium md:text-xl">
+            Mailbox · {name}
+          </h1>
+          <p className="truncate text-sm text-muted-foreground">{address}</p>
         </div>
-        <span className="text-sm font-medium">{folderLabel(folder)}</span>
+        <span className="shrink-0 text-sm font-medium">
+          {folderLabel(folder)}
+        </span>
       </div>
     </header>
   );
