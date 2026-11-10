@@ -127,6 +127,16 @@ export const siteConfig = {
       icon: "Shield",
     },
   ],
+  media: {
+    minijusticia: {
+      title: "Minijusticia",
+      description:
+        "Una mirada a la justicia y la reincorporación a la vida civil en Colombia.",
+      src: "media/minijusticia.mp4",
+      poster: "/images/media/minijusticia-poster.jpg",
+      duration: "10:32",
+    },
+  },
   impactStats: [
     { label: "Países", value: "23+", icon: "Globe" },
     { label: "Años de Experiencia", value: "50+", icon: "Calendar" },
