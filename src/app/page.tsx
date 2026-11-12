@@ -5,7 +5,7 @@ import {
   ProgramsPreview,
   CTASection,
 } from "@/components/sections/home-sections";
-import { MinijusticiaVideoSection } from "@/components/sections/video-section";
+import { OfficialVideoSection } from "@/components/sections/video-section";
 import { generateSiteMetadata } from "@/lib/metadata";
 
 export const metadata = generateSiteMetadata();
@@ -15,7 +15,7 @@ export default function HomePage() {
     <SiteLayout>
       <HeroSection />
       <WelcomeSection />
-      <MinijusticiaVideoSection />
+      <OfficialVideoSection />
       <ProgramsPreview />
       <CTASection />
     </SiteLayout>

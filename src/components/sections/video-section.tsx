@@ -1,13 +1,13 @@
 import { siteConfig } from "@/lib/config";
 import { mediaUrl } from "@/lib/media";
 
-export function MinijusticiaVideoSection() {
-  const video = siteConfig.media.minijusticia;
+export function OfficialVideoSection() {
+  const video = siteConfig.media.oficial;
   const src = mediaUrl(video.src);
 
   return (
     <section
-      id="minijusticia"
+      id="video-oficial"
       className="relative overflow-hidden bg-[#1B3A5C] py-20"
     >
       <div
@@ -18,7 +18,7 @@ export function MinijusticiaVideoSection() {
       <div className="container relative mx-auto px-4">
         <div className="mx-auto mb-10 max-w-3xl text-center">
           <span className="inline-block rounded-full border border-[#C5A55A]/40 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#C5A55A]">
-            Documental
+            Video oficial
           </span>
           <h2 className="mt-4 text-3xl font-bold text-white md:text-4xl">
             {video.title}

@@ -128,13 +128,13 @@ export const siteConfig = {
     },
   ],
   media: {
-    minijusticia: {
-      title: "Minijusticia",
+    oficial: {
+      title: "Criminon Colombia",
       description:
-        "Una mirada a la justicia y la reincorporación a la vida civil en Colombia.",
-      src: "media/minijusticia.mp4",
-      poster: "/images/media/minijusticia-poster.jpg",
-      duration: "10:32",
+        "Conoce nuestra misión y el trabajo de Criminon Colombia por la rehabilitación y la prevención del delito.",
+      src: "media/video-oficial-criminon-colombia.mp4",
+      poster: "/images/media/video-oficial-criminon-poster.jpg",
+      duration: "9:00",
     },
   },
   impactStats: [
