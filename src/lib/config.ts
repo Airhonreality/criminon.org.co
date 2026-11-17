@@ -131,7 +131,7 @@ export const siteConfig = {
       description:
         "Conoce nuestra misión y el trabajo de Criminon Colombia por la rehabilitación y la prevención del delito.",
       src: "media/video-oficial-criminon-colombia.mp4",
-      poster: "/images/media/video-oficial-criminon-poster.jpg",
+      poster: "/images/media/video-oficial-criminon-inicio.jpg",
       duration: "9:00",
     },
   },
