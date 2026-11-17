@@ -43,9 +43,7 @@ export const siteConfig = {
       href: "/programs",
       children: [
         { label: "Programas para Adultos", href: "/programs#adultos" },
-        { label: "Programas para Jóvenes", href: "/programs#jovenes" },
         { label: "Cursos por Correspondencia", href: "/courses" },
-        { label: "Capacitación y Alianzas", href: "/programs#capacitacion" },
       ],
     },
     { label: "Nuestro Impacto", href: "/impact" },
@@ -55,13 +53,13 @@ export const siteConfig = {
   ],
   footer: {
     programs: [
-      { label: "El Camino a la Felicidad", href: "/courses/camino-felicidad" },
-      { label: "Habilidades de Comunicación", href: "/courses/habilidades-comunicacion" },
-      { label: "Herramientas de Estudio", href: "/courses/herramientas-estudio" },
-      { label: "Manejo de la Supresión", href: "/courses/supresion" },
-      { label: "Valores e Integridad", href: "/courses/valores-integridad" },
-      { label: "Condiciones de Vida", href: "/courses/condiciones-vida" },
-      { label: "Superando la Adicción", href: "/courses/superando-adiccion" },
+      { label: "El Camino a la Felicidad", href: "/courses#camino-felicidad" },
+      { label: "Habilidades de Comunicación", href: "/courses#habilidades-comunicacion" },
+      { label: "Herramientas de Estudio", href: "/courses#herramientas-estudio" },
+      { label: "Manejo de la Supresión", href: "/courses#supresion" },
+      { label: "Valores e Integridad", href: "/courses#valores-integridad" },
+      { label: "Condiciones de Vida", href: "/courses#condiciones-vida" },
+      { label: "Superando la Adicción", href: "/courses#superando-adiccion" },
     ],
     organization: [
       { label: "Sobre Criminon", href: "/about" },
@@ -72,7 +70,7 @@ export const siteConfig = {
     ],
     getInvolved: [
       { label: "Ser Voluntario", href: "/volunteer" },
-      { label: "Ser Patrocinador", href: "/about#patrocinadores" },
+      { label: "Ser Patrocinador", href: "/donate" },
       { label: "Solicitar un Curso", href: "/courses/request" },
       { label: "Donar", href: "/donate" },
     ],

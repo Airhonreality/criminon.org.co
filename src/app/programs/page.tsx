@@ -154,7 +154,7 @@ export default function ProgramsPage() {
                       </p>
                       <p className="text-stone-600 mb-4">{course.description}</p>
                       <Button variant="outline" size="sm" asChild>
-                        <Link href={`/courses/${course.id}`}>Más Información</Link>
+                        <Link href={`/courses#${course.id}`}>Más Información</Link>
                       </Button>
                     </div>
                   </div>

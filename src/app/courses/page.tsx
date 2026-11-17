@@ -124,7 +124,8 @@ export default function CoursesPage() {
             {courses.map((course) => (
               <Card
                 key={course.id}
-                className="overflow-hidden hover:shadow-xl transition-all group"
+                id={course.id}
+                className="overflow-hidden hover:shadow-xl transition-all group scroll-mt-28"
               >
                 <div className={`h-2 ${course.color}`} />
                 <CardContent className="p-6">
@@ -137,20 +138,9 @@ export default function CoursesPage() {
                   <p className="text-[#E8734A] text-sm font-medium mb-3">
                     {course.objective}
                   </p>
-                  <p className="text-stone-600 text-sm mb-6">
+                  <p className="text-stone-600 text-sm">
                     {course.description}
                   </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="group-hover:bg-[#E8734A] group-hover:text-white group-hover:border-[#E8734A] transition-colors"
-                    asChild
-                  >
-                    <Link href={`/courses/${course.id}`}>
-                      Ver Detalles
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
                 </CardContent>
               </Card>
             ))}

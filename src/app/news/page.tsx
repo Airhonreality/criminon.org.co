@@ -4,8 +4,7 @@ import { generatePageMetadata } from "@/lib/metadata";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import Link from "next/link";
-import { Calendar, ArrowRight } from "lucide-react";
+import { Calendar } from "lucide-react";
 
 export const metadata: Metadata = generatePageMetadata({
   title: "Noticias",
@@ -91,16 +90,9 @@ export default function NewsPage() {
                   <h2 className="font-bold text-lg text-[#1B3A5C] mb-2 line-clamp-2">
                     {item.title}
                   </h2>
-                  <p className="text-sm text-stone-600 mb-4 line-clamp-3">
+                  <p className="text-sm text-stone-600 line-clamp-3">
                     {item.excerpt}
                   </p>
-                  <Link
-                    href={`/news/${item.slug}`}
-                    className="text-[#E8734A] text-sm font-medium hover:underline inline-flex items-center"
-                  >
-                    Leer más
-                    <ArrowRight className="ml-1 h-4 w-4" />
-                  </Link>
                 </CardContent>
               </Card>
             ))}

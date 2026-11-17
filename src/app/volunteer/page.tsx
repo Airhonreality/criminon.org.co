@@ -20,7 +20,7 @@ const ways = [
     description:
       "Comparte tu tiempo y habilidades para ayudar a personas en proceso de reintegración. Capacitación incluida.",
     cta: "Registrarse como Voluntario",
-    href: "/volunteer/register",
+    href: "/contact",
   },
   {
     icon: <Users className="h-8 w-8" />,
@@ -28,7 +28,7 @@ const ways = [
     description:
       "Las empresas pueden patrocinarse para financiar cursos y materiales para centros penitenciarios.",
     cta: "Más Información",
-    href: "/about#patrocinadores",
+    href: "/donate",
   },
   {
     icon: <BookOpen className="h-8 w-8" />,

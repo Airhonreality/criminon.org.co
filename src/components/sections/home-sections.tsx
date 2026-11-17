@@ -193,7 +193,7 @@ export function ProgramsPreview() {
                   </h3>
                   <p className="text-sm text-stone-600 mb-4">{course.objective}</p>
                   <Link
-                    href={`/courses/${course.id}`}
+                    href={`/courses#${course.id}`}
                     className="text-[#E8734A] text-sm font-medium hover:underline inline-flex items-center"
                   >
                     Ver detalles
