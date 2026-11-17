@@ -21,10 +21,11 @@ export function HeroSection() {
       {/* Hero */}
       <div className="relative h-[600px] lg:h-[700px]">
         <Image
-          src="/images/team/graduation-south-africa.jpg"
-          alt="Graduación Criminon Sudáfrica"
+          src="/images/hero/criminon-group.jpg"
+          alt="Grupo de participantes de Criminon Colombia"
           fill
           className="object-cover"
+          style={{ objectPosition: "center 35%" }}
           priority
         />
         <div className="absolute inset-0 bg-gradient-to-r from-[#1B3A5C]/90 to-[#1B3A5C]/60" />
@@ -63,7 +64,7 @@ export function HeroSection() {
               <Button
                 size="xl"
                 variant="outline"
-                className="border-white text-white hover:bg-white hover:text-[#1B3A5C]"
+                className="border-white bg-transparent text-white hover:bg-white hover:text-[#1B3A5C]"
                 asChild
               >
                 <Link href="/about">
@@ -239,7 +240,7 @@ export function CTASection() {
           <Button
             size="xl"
             variant="outline"
-            className="border-white text-white hover:bg-white hover:text-[#1B3A5C]"
+            className="border-white bg-transparent text-white hover:bg-white hover:text-[#1B3A5C]"
             asChild
           >
             <Link href="/volunteer">Ser Voluntario</Link>
