@@ -21,7 +21,7 @@ export function HeroSection() {
       {/* Hero */}
       <div className="relative h-[600px] lg:h-[700px]">
         <Image
-          src="/images/hero/criminon-group.jpg"
+          src="/images/hero/criminon-portada.jpg"
           alt="Grupo de participantes de Criminon Colombia"
           fill
           className="object-cover"
