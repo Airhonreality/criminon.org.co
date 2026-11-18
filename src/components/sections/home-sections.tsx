@@ -144,6 +144,7 @@ export function WelcomeSection() {
                 alt="Apertura de Criminon Colombia"
                 width={1195}
                 height={896}
+                sizes="(min-width: 1024px) 50vw, 100vw"
                 className="object-cover w-full h-auto"
               />
             </div>
