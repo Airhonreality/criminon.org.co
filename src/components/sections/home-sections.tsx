@@ -140,10 +140,10 @@ export function WelcomeSection() {
           <div className="relative">
             <div className="relative rounded-lg overflow-hidden shadow-2xl">
               <Image
-                src="/images/facilities/criminon-building.jpg"
-                alt="Edificio Criminon"
-                width={600}
-                height={400}
+                src="/images/facilities/apertura-colombia.jpg"
+                alt="Apertura de Criminon Colombia"
+                width={1195}
+                height={896}
                 className="object-cover w-full h-auto"
               />
             </div>
